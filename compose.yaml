@@ -32,8 +32,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-sorasense}
       POSTGRES_USER: ${POSTGRES_USER:-sorasense_owner}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      SORASENSE_MIGRATOR_PASSWORD: ${SORASENSE_MIGRATOR_PASSWORD:?SORASENSE_MIGRATOR_PASSWORD must be set}
+      SORASENSE_APP_PASSWORD: ${SORASENSE_APP_PASSWORD:?SORASENSE_APP_PASSWORD must be set}
+      GRAFANA_READER_PASSWORD: ${GRAFANA_READER_PASSWORD:?GRAFANA_READER_PASSWORD must be set}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db/001-create-roles.sh:/docker-entrypoint-initdb.d/001-create-roles.sh:ro
     networks:
       - backend
     healthcheck:

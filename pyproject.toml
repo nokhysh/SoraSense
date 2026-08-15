@@ -30,6 +30,9 @@ packages = ["app"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--strict-config", "--strict-markers"]
+markers = [
+    "integration: PostgreSQLなど外部サービスとの結合テスト",
+]
 
 [tool.ruff]
 target-version = "py312"
