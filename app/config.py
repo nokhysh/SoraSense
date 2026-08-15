@@ -2,7 +2,7 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     environment: Environment = Environment.DEVELOPMENT
     title: str = "SoraSense API"
+    database_url: PostgresDsn | None = None
 
     @property
     def api_docs_enabled(self) -> bool:
