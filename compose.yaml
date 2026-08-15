@@ -51,6 +51,34 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  migration:
+    profiles:
+      - tools
+    build:
+      context: .
+    environment:
+      MIGRATION_DB_HOST: postgres
+      MIGRATION_DB_PORT: "5432"
+      MIGRATION_DB_NAME: ${POSTGRES_DB:-sorasense}
+      MIGRATION_DB_USER: sorasense_migrator
+      MIGRATION_DB_PASSWORD: ${SORASENSE_MIGRATOR_PASSWORD:?SORASENSE_MIGRATOR_PASSWORD must be set}
+    entrypoint:
+      - alembic
+    command:
+      - current
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
 volumes:
   postgres_data:
 
