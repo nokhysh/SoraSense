@@ -65,10 +65,36 @@ services:
     entrypoint:
       - alembic
     command:
-      - current
+      - upgrade
+      - head
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - backend
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  device-init:
+    profiles:
+      - tools
+    build:
+      context: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://sorasense_app:${SORASENSE_APP_PASSWORD:?SORASENSE_APP_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-sorasense}
+      DEVICE_ID: ${DEVICE_ID:-}
+    entrypoint:
+      - python
+      - -m
+      - app.db.device_initializer
+    depends_on:
+      migration:
+        condition: service_completed_successfully
     networks:
       - backend
     read_only: true

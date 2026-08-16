@@ -42,11 +42,11 @@ def test_devices_table_accepts_valid_device_id(migration_database_url: str) -> N
             VALUES (%s)
             RETURNING device_id, registered_at, last_alert_evaluated_at
             """,
-            ("living-room-01",),
+            ("devices-schema-valid-test",),
         ).fetchone()
         connection.rollback()
 
     assert device is not None
-    assert device[0] == "living-room-01"
+    assert device[0] == "devices-schema-valid-test"
     assert device[1] is not None
     assert device[2] is None
