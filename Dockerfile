@@ -13,7 +13,8 @@ COPY app ./app
 COPY alembic.ini ./
 COPY alembic ./alembic
 
-RUN pip install --no-cache-dir .
+ARG PROJECT_INSTALL=.
+RUN pip install --no-cache-dir "${PROJECT_INSTALL}"
 
 USER sorasense
 

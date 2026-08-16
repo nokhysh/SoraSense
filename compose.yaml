@@ -4,10 +4,16 @@ services:
       context: .
     environment:
       APP_ENVIRONMENT: development
+      APP_DATABASE_URL: postgresql+psycopg://sorasense_app:${SORASENSE_APP_PASSWORD:?SORASENSE_APP_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-sorasense}
+      APP_DEVICE_ID: ${DEVICE_ID:?DEVICE_ID must be set}
+      APP_DEVICE_API_KEY_HASH: ${DEVICE_API_KEY_HASH:?DEVICE_API_KEY_HASH must be set}
     ports:
       - "127.0.0.1:8000:8000"
     networks:
       - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
     read_only: true
     tmpfs:
       - /tmp
