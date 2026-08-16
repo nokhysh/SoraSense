@@ -52,7 +52,14 @@ ALTER ROLE grafana_reader WITH
 
 SELECT format('REVOKE ALL ON DATABASE %I FROM PUBLIC', current_database()) \gexec
 SELECT format(
-    'GRANT CONNECT ON DATABASE %I TO sorasense_migrator, sorasense_app, grafana_reader',
+    'GRANT CONNECT, CREATE ON DATABASE %I TO sorasense_migrator',
     current_database()
 ) \gexec
+SELECT format(
+    'GRANT CONNECT ON DATABASE %I TO sorasense_app, grafana_reader',
+    current_database()
+) \gexec
+
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA public TO sorasense_migrator;
 SQL
