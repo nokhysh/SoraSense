@@ -9,9 +9,12 @@ from enum import StrEnum
 from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.config import AlertSettings
 from app.models.measurement import Measurement
+from app.repositories.alert_repository import AlertRepository
 from app.repositories.measurement_repository import MeasurementRepository
 from app.schemas.measurement import MeasurementRequest
+from app.services.alert_service import AlertService
 
 
 class AcceptanceResult(StrEnum):
@@ -39,10 +42,16 @@ class MeasurementService:
     def __init__(
         self,
         session_factory: sessionmaker[Session],
+        alert_settings: AlertSettings | None = None,
         repository: MeasurementRepository | None = None,
+        alert_repository: AlertRepository | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._repository = repository or MeasurementRepository()
+        self._alert_repository = alert_repository or AlertRepository()
+        self._alert_service = AlertService(
+            alert_settings or AlertSettings(), self._alert_repository
+        )
 
     def accept(self, request: MeasurementRequest) -> AcceptanceResult:
         """未登録の測定だけを保存して受付結果を返す。"""
@@ -50,6 +59,9 @@ class MeasurementService:
         try:
             with self._session_factory() as session:
                 try:
+                    device = self._alert_repository.lock_device(session, request.device_id)
+                    if device is None:
+                        raise MeasurementPersistenceError("registered device was not found")
                     existing = self._repository.find_by_message_id(
                         session, request.device_id, request.message_id
                     )
@@ -65,6 +77,18 @@ class MeasurementService:
                             humidity_percent=request.humidity_percent,
                         ),
                     )
+                    if (
+                        device.last_alert_evaluated_at is None
+                        or request.measured_at > device.last_alert_evaluated_at
+                    ):
+                        self._alert_service.evaluate(
+                            session,
+                            request.device_id,
+                            request.measured_at,
+                            request.temperature_c,
+                            request.humidity_percent,
+                        )
+                        device.last_alert_evaluated_at = request.measured_at
                     session.commit()
                     return AcceptanceResult.CREATED
                 except IntegrityError as error:

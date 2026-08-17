@@ -151,7 +151,7 @@ async def create_measurement(device_id: str, request: Request) -> JSONResponse:
     try:
         # SQLAlchemyは同期APIのため、イベントループを止めないようスレッドへ移譲する。
         result = await run_in_threadpool(
-            MeasurementService(session_factory).accept,
+            MeasurementService(session_factory, settings.alerts).accept,
             measurement,
         )
     except DatabaseUnavailableError:

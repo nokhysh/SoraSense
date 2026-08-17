@@ -145,7 +145,7 @@ def test_database_work_is_delegated_and_success_is_logged(
     class FakeMeasurementService:
         """DBを使用せず新規受付結果を返す。"""
 
-        def __init__(self, session_factory: object) -> None:
+        def __init__(self, session_factory: object, alert_settings: object) -> None:
             pass
 
         def accept(self, measurement: object) -> AcceptanceResult:
