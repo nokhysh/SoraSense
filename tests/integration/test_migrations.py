@@ -66,6 +66,7 @@ def test_migrations_upgrade_from_empty_and_downgrade_each_revision(
         "0002_measurements": {"devices", "measurements"},
         "0003_alerts": {"devices", "measurements", "alerts"},
         "0004_ai_requests": {"devices", "measurements", "alerts", "ai_requests"},
+        "0005_reporting": {"devices", "measurements", "alerts", "ai_requests"},
     }
 
     try:

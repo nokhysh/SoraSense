@@ -1,0 +1,101 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {"asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": [], "targetBlank": false, "title": "AIに質問", "tooltip": "AI質問画面を開く", "type": "link", "url": "http://localhost:8000/agent"}
+  ],
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "sorasense-postgresql"},
+      "fieldConfig": {"defaults": {"mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 2}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"datasource": {"type": "postgres", "uid": "sorasense-postgresql"}, "format": "table", "rawQuery": true, "rawSql": "SELECT CASE status WHEN 'ONLINE' THEN 2 WHEN 'STALE' THEN 1 ELSE 0 END AS value, status AS \"状態\" FROM reporting.v_device_statuses WHERE device_id = ${device_id:sqlstring}", "refId": "A"}],
+      "title": "デバイス状態",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "sorasense-postgresql"},
+      "fieldConfig": {"defaults": {"decimals": 1, "unit": "celsius"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"format": "table", "rawQuery": true, "rawSql": "SELECT temperature_c AS \"温度\" FROM reporting.v_latest_measurements WHERE device_id = ${device_id:sqlstring}", "refId": "A"}],
+      "title": "最新温度",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "sorasense-postgresql"},
+      "fieldConfig": {"defaults": {"decimals": 1, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"format": "table", "rawQuery": true, "rawSql": "SELECT humidity_percent AS \"湿度\" FROM reporting.v_latest_measurements WHERE device_id = ${device_id:sqlstring}", "refId": "A"}],
+      "title": "最新湿度",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "sorasense-postgresql"},
+      "fieldConfig": {"defaults": {"unit": "dateTimeAsIso"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "none", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"format": "table", "rawQuery": true, "rawSql": "SELECT received_at AS \"最終受信\" FROM reporting.v_latest_measurements WHERE device_id = ${device_id:sqlstring}", "refId": "A"}],
+      "title": "最終受信日時",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "sorasense-postgresql"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 5},
+      "id": 5,
+      "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT measured_at AS time, temperature_c AS \"温度 ℃\", humidity_percent AS \"湿度 %\" FROM reporting.v_measurement_series WHERE device_id = ${device_id:sqlstring} AND $__timeFilter(measured_at) ORDER BY measured_at", "refId": "A"}],
+      "title": "温湿度履歴",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "sorasense-postgresql"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 14},
+      "id": 6,
+      "options": {"showHeader": true},
+      "targets": [{"format": "table", "rawQuery": true, "rawSql": "SELECT MIN(temperature_c) AS \"温度 最小\", MAX(temperature_c) AS \"温度 最大\", ROUND(AVG(temperature_c), 2) AS \"温度 平均\", MIN(humidity_percent) AS \"湿度 最小\", MAX(humidity_percent) AS \"湿度 最大\", ROUND(AVG(humidity_percent), 2) AS \"湿度 平均\", COUNT(*) AS \"件数\" FROM reporting.v_measurement_series WHERE device_id = ${device_id:sqlstring} AND $__timeFilter(measured_at)", "refId": "A"}],
+      "title": "温湿度統計",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "sorasense-postgresql"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 14},
+      "id": 7,
+      "options": {"showHeader": true},
+      "targets": [{"format": "table", "rawQuery": true, "rawSql": "SELECT previous_measured_at AS \"直前\", next_measured_at AS \"直後\", interval_seconds AS \"間隔（秒）\", estimated_missing_count AS \"推定欠損件数\" FROM reporting.v_measurement_gaps WHERE device_id = ${device_id:sqlstring} AND $__timeFilter(next_measured_at) ORDER BY next_measured_at DESC", "refId": "A"}],
+      "title": "測定データ欠損",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "sorasense-postgresql"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 14},
+      "id": 8,
+      "options": {"showHeader": true},
+      "targets": [{"format": "table", "rawQuery": true, "rawSql": "SELECT metric AS \"項目\", direction AS \"方向\", status AS \"状態\", threshold_value AS \"閾値\", trigger_value AS \"発生値\", started_at AS \"発生日時\", resolved_at AS \"解消日時\" FROM reporting.v_alert_history WHERE device_id = ${device_id:sqlstring} AND $__timeFilter(started_at) ORDER BY started_at DESC", "refId": "A"}],
+      "title": "アラート履歴",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["sorasense"],
+  "templating": {"list": [{"current": {"selected": true, "text": "living-room-01", "value": "living-room-01"}, "hide": 0, "label": "デバイス", "name": "device_id", "options": [{"selected": true, "text": "living-room-01", "value": "living-room-01"}], "query": "living-room-01", "skipUrlSync": false, "type": "constant"}]},
+  "time": {"from": "now-24h", "to": "now"},
+  "timezone": "Asia/Tokyo",
+  "title": "SoraSense Overview",
+  "uid": "sorasense-overview",
+  "version": 1
+}

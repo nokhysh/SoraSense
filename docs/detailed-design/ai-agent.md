@@ -4,8 +4,16 @@
 
 | 項目 | 内容 |
 |---|---|
-| 文書版数 | 0.0.0 |
+| 文書版数 | 0.1.0 |
+| 入力文書 | 要件定義書 v0.1.0、基本設計書 v0.3.0 |
 | 対象 | OpenAI Agents SDK、Agent Instructions、参照専用Tool、利用量記録 |
+
+### 1.1 変更履歴
+
+| 版数 | 日付 | 変更内容 |
+|---|---|---|
+| 0.1.0 | 2026年8月21日 | Toolの表示・集計タイムゾーンをAsia/Tokyoに固定 |
+| 0.0.0 | 2026年8月13日 | 版数管理開始時点のAI Agent詳細設計を登録 |
 
 ## 2. 処理境界
 
@@ -41,7 +49,7 @@ AgentRunnerは、質問中に実行した各Toolの名前、正規化済み入�
 
 - `device_id`は初期リリースの設定済みIDと一致する値だけを許可する。
 - `from`、`to`はISO 8601で受け、`from < to`を必須とする。
-- `timezone`はIANA Time Zone Databaseの名前だけを許可する。
+- 表示および集計タイムゾーンは`Asia/Tokyo`に固定し、Tool入力として`timezone`を受け付けない。
 - Tool結果には`data_status`として`AVAILABLE`、`NO_DATA`、`UNAVAILABLE`のいずれかを含める。
 - Tool例外を生のままモデルへ渡さず、安全なコードと再試行可否へ変換する。
 
@@ -50,9 +58,9 @@ AgentRunnerは、質問中に実行した各Toolの名前、正規化済み入�
 | Tool | 入力 | 出力 | 制限 |
 |---|---|---|---|
 | `get_latest_measurement` | `device_id` | 温度、湿度、測定日時、受信日時 | 1件 |
-| `get_measurement_statistics` | `device_id`, `from`, `to`, `timezone` | 各項目の最小・最大・平均・件数 | 最大90日 |
-| `get_measurement_series` | `device_id`, `from`, `to`, `granularity`, `timezone` | バケット、平均、最小、最大、件数 | 最大90日、500点 |
-| `compare_periods` | `device_id`, 2期間, `timezone` | 両期間の統計と絶対差 | 各期間最大90日 |
+| `get_measurement_statistics` | `device_id`, `from`, `to` | 各項目の最小・最大・平均・件数、固定タイムゾーン`Asia/Tokyo` | 最大90日 |
+| `get_measurement_series` | `device_id`, `from`, `to`, `granularity` | バケット、平均、最小、最大、件数、固定タイムゾーン`Asia/Tokyo` | 最大90日、500点 |
+| `compare_periods` | `device_id`, 2期間 | 両期間の統計と絶対差、固定タイムゾーン`Asia/Tokyo` | 各期間最大90日 |
 | `get_alert_history` | `device_id`, `from`, `to`, `status` | アラート配列、総件数、切詰め有無 | 最大100件 |
 
 `granularity`は`hour`または`day`に限定する。500点を超える指定は自動切詰めせず入力エラーとする。アラート状態は`OPEN`、`RESOLVED`、`ALL`とする。
@@ -63,7 +71,7 @@ Instructionsには少なくとも次を記載する。
 
 1. SoraSenseに保存された温度・湿度・アラートだけを回答対象とする。
 2. 数値を述べる場合は必ずTool結果を根拠とし、計算する場合も入力値と計算式を明示する。
-3. 対象期間、タイムゾーン、主要な根拠値を回答に含める。
+3. 対象期間、固定タイムゾーン`Asia/Tokyo`、主要な根拠値を回答に含める。
 4. `NO_DATA`は「該当データなし」、`UNAVAILABLE`は「現在取得不能」と区別する。
 5. Tool結果にない原因、健康影響、安全性を断定しない。
 6. データ変更・削除、任意SQL、任意URLへのアクセス要求は実行できないと説明する。
@@ -91,14 +99,14 @@ AgentRunnerはモデルに自由文だけでなく次の構造を返させる。
 |---|---|
 | `answer` | 利用者向け回答 |
 | `period_from`, `period_to` | 根拠期間。現在値のみの場合はNULL可 |
-| `timezone` | 表示タイムゾーン |
+| `timezone` | 固定表示タイムゾーン`Asia/Tokyo` |
 | `evidence` | 項目名、値、単位、測定・集計時刻の配列 |
 | `data_status` | `AVAILABLE` / `NO_DATA` / `UNAVAILABLE` |
 
 AgentRunnerはモデル出力の構造検証後、保持しているTool実行履歴を正本として、次の意味検証と根拠値確定を行う。
 
 1. `evidence`の各要素が、実際に実行したTool結果の項目、値、単位および測定・集計時刻と一致することを確認する。文字列表現の差はDTOで定義した正規化後の値で比較し、数値の丸めはTool DTOの表示精度だけを許可する。
-2. `period_from`、`period_to`、`timezone`および`data_status`が、根拠に使用したToolの入力・結果と一致することを確認する。
+2. `period_from`、`period_to`および`data_status`が根拠に使用したToolの入力・結果と一致し、`timezone`が固定値`Asia/Tokyo`であることを確認する。
 3. `answer`から温度、湿度、件数、差分その他の測定データ由来の数値を抽出し、Tool結果またはTool結果だけを入力とする明示された計算で再現できることを確認する。許可する計算は差、増減率およびTool結果に含まれる集計値同士の比較とし、ゼロ除算など計算不能な場合は数値を生成しない。
 4. 検証成功後、表示用`evidence`はモデル出力をそのまま採用せず、対応するTool実行履歴からAgentRunnerが再構築する。
 

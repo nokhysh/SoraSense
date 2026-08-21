@@ -165,7 +165,7 @@ AI質問画面 → AI Agent
 - `reporting`スキーマのVIEW一式を作成する。
 - 最新値、デバイス状態、時系列、欠損区間、アラート履歴およびAI利用量を提供する。
 - `QueryService`と型付きDTOを作成する。
-- 統計、期間比較、半開区間およびタイムゾーン境界処理を実装する。
+- 統計、期間比較、半開区間および`Asia/Tokyo`固定の時間境界処理を実装する。
 - `grafana_reader`へVIEWのSELECT権限だけを付与する。
 - Grafanaのデータソース、フォルダーおよびダッシュボードをProvisioningする。
 - GrafanaとAI質問画面の相互リンクを準備する。

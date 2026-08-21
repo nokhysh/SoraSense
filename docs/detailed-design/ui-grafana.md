@@ -4,8 +4,16 @@
 
 | 項目 | 内容 |
 |---|---|
-| 文書版数 | 0.0.0 |
+| 文書版数 | 0.1.0 |
+| 入力文書 | 要件定義書 v0.1.0、基本設計書 v0.3.0 |
 | 対象 | AI質問Web画面、利用者認証、Grafanaダッシュボード |
+
+### 1.1 変更履歴
+
+| 版数 | 日付 | 変更内容 |
+|---|---|---|
+| 0.1.0 | 2026年8月21日 | AI画面とGrafanaの表示タイムゾーンをAsia/Tokyoに固定 |
+| 0.0.0 | 2026年8月13日 | 版数管理開始時点のUI・Grafana詳細設計を登録 |
 
 ## 2. 画面と経路
 
@@ -68,7 +76,7 @@ PostgreSQLデータソースは`grafana_reader`を使用し、`reporting`スキ�
 | デバイス状態 | `v_device_statuses` | Stat、状態別色 | 30秒 |
 | 最新温度 | `v_latest_measurements` | Stat、℃ | 30秒 |
 | 最新湿度 | `v_latest_measurements` | Stat、% | 30秒 |
-| 最終受信日時 | `v_latest_measurements` | Stat、利用者TZ | 30秒 |
+| 最終受信日時 | `v_latest_measurements` | Stat、`Asia/Tokyo` | 30秒 |
 | 温湿度履歴 | `v_measurement_series` | Time series、2軸 | 選択期間 |
 | 温湿度統計 | `v_measurement_series` | Table、min/max/avg | 選択期間 |
 | 測定データ欠損 | `v_measurement_gaps` | Table、欠損区間・推定件数 | 選択期間 |
@@ -79,7 +87,7 @@ PostgreSQLデータソースは`grafana_reader`を使用し、`reporting`スキ�
 ## 9. 表示規則
 
 - 温度は小数第1位と`℃`、湿度は小数第1位と`%`で表示する。
-- 日時はGrafanaユーザープロファイルまたはAI画面設定のIANAタイムゾーンで表示する。
+- GrafanaとAI画面の日時は`Asia/Tokyo`で表示し、利用者によるタイムゾーン選択は提供しない。
 - データなしを0として表示しない。
 - ONLINEは緑、STALEは黄、OFFLINEは赤とし、色だけでなくテキストも表示する。
 - アラートは項目、方向、状態、閾値、発生値、発生・解消日時を確認可能にする。

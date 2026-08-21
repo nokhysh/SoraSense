@@ -117,9 +117,48 @@ services:
     cap_drop:
       - ALL
 
+  grafana:
+    image: grafana/grafana:13.1.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_EXPLORE_ENABLED: "false"
+      GRAFANA_READER_PASSWORD: ${GRAFANA_READER_PASSWORD:?GRAFANA_READER_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-sorasense}
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - backend
+      - frontend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/lib/grafana
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:3000/api/health
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
 volumes:
   postgres_data:
 
 networks:
+  frontend:
   backend:
     internal: true

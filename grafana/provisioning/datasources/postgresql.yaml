@@ -1,0 +1,24 @@
+apiVersion: 1
+
+deleteDatasources:
+  - name: SoraSense PostgreSQL
+    orgId: 1
+
+datasources:
+  - name: SoraSense PostgreSQL
+    uid: sorasense-postgresql
+    orgId: 1
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: grafana_reader
+    database: ${POSTGRES_DB}
+    isDefault: true
+    editable: false
+    jsonData:
+      database: ${POSTGRES_DB}
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    secureJsonData:
+      password: ${GRAFANA_READER_PASSWORD}

@@ -12,7 +12,8 @@ from app.models import Base
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # 同一プロセスでMigrationを実行するテストや管理処理のLoggerを無効化しない。
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
