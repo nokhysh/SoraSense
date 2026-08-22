@@ -1,13 +1,5 @@
 # SoraSense 詳細設計書 — AI Agent
 
-## 1. 文書情報
-
-| 項目 | 内容 |
-|---|---|
-| 文書版数 | 0.1.0 |
-| 入力文書 | 要件定義書 v0.1.0、基本設計書 v0.3.0 |
-| 対象 | OpenAI Agents SDK、Agent Instructions、参照専用Tool、利用量記録 |
-
 ## 2. 処理境界
 
 AI質問は一問一答であり、過去の質問、回答、Tool結果を次の質問へ渡さない。測定データ受付処理からAgentを呼び出さない。Agentは`QueryService`の型付き参照メソッドだけをToolとして利用し、DB接続、SQL、HTTP URL、ファイル操作、更新処理を公開しない。
