@@ -57,7 +57,7 @@ flowchart LR
 
 ### 6.1 識別子と日時
 
-- `message_id`、AI要求ID、セッションID、リクエストIDにはUUID v4を使用する。
+- `message_id`、AI要求IDおよびリクエストIDにはUUID v4を使用する。セッションIDは`ui-grafana.md`で定義する256ビット暗号学的乱数の不透明トークンを使用する。
 - DBの日時型は`timestamptz`、APIはISO 8601のUTC表記（末尾`Z`）を使用する。
 - サーバー時刻はUTCで扱い、OSとデバイスはNTPで同期する。
 - `device_id`は英小文字、数字、ハイフンからなる1～64文字とする。

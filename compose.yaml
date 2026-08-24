@@ -7,6 +7,9 @@ services:
       APP_DATABASE_URL: postgresql+psycopg://sorasense_app:${SORASENSE_APP_PASSWORD:?SORASENSE_APP_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-sorasense}
       APP_DEVICE_ID: ${DEVICE_ID:?DEVICE_ID must be set}
       APP_DEVICE_API_KEY_HASH: ${DEVICE_API_KEY_HASH:?DEVICE_API_KEY_HASH must be set}
+      APP_WEB_USERNAME: ${WEB_USERNAME:?WEB_USERNAME must be set}
+      APP_WEB_PASSWORD_HASH: ${WEB_PASSWORD_HASH:?WEB_PASSWORD_HASH must be set}
+      APP_WEB_SECURE_COOKIE: "false"
       APP_ALERTS__TEMPERATURE__LOWER: ${TEMPERATURE_LOWER:-10.0}
       APP_ALERTS__TEMPERATURE__UPPER: ${TEMPERATURE_UPPER:-35.0}
       APP_ALERTS__TEMPERATURE__HYSTERESIS: ${TEMPERATURE_HYSTERESIS:-0.5}
@@ -17,6 +20,7 @@ services:
       - "127.0.0.1:8000:8000"
     networks:
       - backend
+      - frontend
     depends_on:
       postgres:
         condition: service_healthy

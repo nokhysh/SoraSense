@@ -23,7 +23,7 @@ PostgreSQLをホストへ公開しない。`app`と`grafana`は別DBユーザー
 | 分類 | 主な設定 |
 |---|---|
 | App | `DATABASE_URL`、`DEVICE_ID`、`APP_TIMEZONE`、`OPENAI_MODEL` |
-| Secret | `DEVICE_API_KEY_HASH`、`WEB_PASSWORD_HASH`、`SESSION_SECRET`、`OPENAI_API_KEY`、DBパスワード |
+| Secret | `DEVICE_API_KEY_HASH`、`WEB_PASSWORD_HASH`、`OPENAI_API_KEY`、DBパスワード |
 | Grafana | 管理者認証、`grafana_reader`接続情報、公開URL |
 | Device | API URL、Wi-Fi、デバイスAPIキー、CA証明書 |
 

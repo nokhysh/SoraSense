@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}エラー | SoraSense{% endblock %}
+{% block content %}
+  <section class="card" aria-labelledby="error-heading">
+    <h1 id="error-heading">処理できませんでした</h1>
+    <p class="error" role="alert">{{ message }}</p>
+    <p><a href="/login">ログイン画面へ戻る</a></p>
+    <p class="request-id">リクエストID: {{ request_id }}</p>
+  </section>
+{% endblock %}

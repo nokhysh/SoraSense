@@ -1,6 +1,8 @@
 """ヘルスチェックとアプリケーション生成を検証する。"""
 
+from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.config import Environment, Settings
 from app.main import create_app
@@ -28,7 +30,15 @@ def test_api_documentation_is_available_outside_production() -> None:
 def test_api_documentation_is_hidden_in_production() -> None:
     """本番環境ではAPIドキュメントを公開しない。"""
 
-    client = TestClient(create_app(Settings(environment=Environment.PRODUCTION)))
+    client = TestClient(
+        create_app(
+            Settings(
+                environment=Environment.PRODUCTION,
+                web_username="admin",
+                web_password_hash=SecretStr(PasswordHasher().hash("test-password")),
+            )
+        )
+    )
 
     assert client.get("/docs").status_code == 404
     assert client.get("/redoc").status_code == 404

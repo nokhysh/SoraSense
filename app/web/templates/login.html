@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}ログイン | SoraSense{% endblock %}
+{% block content %}
+  <section class="card" aria-labelledby="login-heading">
+    <h1 id="login-heading">SoraSense AI</h1>
+    {% if reason %}<p class="notice">{{ reason }}</p>{% endif %}
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" action="/login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="username">利用者名</label>
+      <input id="username" name="username" type="text" maxlength="128" autocomplete="username" required>
+      <label for="password">パスワード</label>
+      <input id="password" name="password" type="password" maxlength="256" autocomplete="current-password" required>
+      <button type="submit">ログイン</button>
+    </form>
+  </section>
+{% endblock %}

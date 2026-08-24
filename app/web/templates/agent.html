@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}AIアシスタント | SoraSense{% endblock %}
+{% block content %}
+  <nav><a href="http://localhost:3001/">Grafanaを開く</a></nav>
+  <section class="card" aria-labelledby="agent-heading">
+    <h1 id="agent-heading">AIアシスタント</h1>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    {% if result %}
+      <section class="answer" aria-live="polite">
+        <h2>回答</h2>
+        <p class="pre-wrap">{{ result.answer }}</p>
+        {% if result.device_id %}<p>対象デバイス: {{ result.device_id }}</p>{% endif %}
+        {% if result.period %}<p>対象期間: {{ result.period }}</p>{% endif %}
+        {% if result.evidence %}
+          <h3>主要な根拠</h3>
+          <ul>{% for item in result.evidence %}<li>{{ item }}</li>{% endfor %}</ul>
+        {% endif %}
+      </section>
+    {% endif %}
+    <form method="post" action="/agent/questions">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="form_token" value="{{ form_token }}">
+      <label for="question">環境データについて質問する</label>
+      <textarea id="question" name="question" maxlength="2000" rows="7" required></textarea>
+      <button type="submit">質問する</button>
+    </form>
+    <form method="post" action="/logout" class="logout-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="secondary">ログアウト</button>
+    </form>
+    <p class="request-id">リクエストID: {{ request_id }}</p>
+  </section>
+{% endblock %}
