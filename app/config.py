@@ -113,6 +113,8 @@ class Settings(BaseSettings):
     web_login_lock_seconds: int = Field(default=900, ge=60, le=86400)
     web_form_max_bytes: int = Field(default=4096, ge=1024, le=65536)
     web_secure_cookie: bool | None = None
+    openai_api_key: SecretStr | None = None
+    openai_model: str = Field(default="gpt-5-mini", min_length=1, max_length=100)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
 
     @field_validator(
@@ -120,6 +122,7 @@ class Settings(BaseSettings):
         "device_api_key_hash",
         "web_username",
         "web_password_hash",
+        "openai_api_key",
         mode="before",
     )
     @classmethod
@@ -164,6 +167,16 @@ class Settings(BaseSettings):
         if self.web_secure_cookie is not None:
             return self.web_secure_cookie
         return self.environment is Environment.PRODUCTION
+
+    @property
+    def ai_enabled(self) -> bool:
+        """Agent実行に必要な設定とDBが揃っているか返す。"""
+
+        return (
+            self.openai_api_key is not None
+            and self.database_url is not None
+            and self.device_id is not None
+        )
 
 
 class HealthResponse(BaseModel):

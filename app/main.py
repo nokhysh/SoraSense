@@ -5,6 +5,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.agent.backend import OpenAIAgentsBackend
+from app.agent.service import AgentService
 from app.api.health_router import router as health_router
 from app.api.measurement_router import router as measurement_router
 from app.config import Settings
@@ -60,6 +62,20 @@ def create_app(settings: Settings) -> FastAPI:
             settings.web_username,
             settings.web_password_hash.get_secret_value(),
         )
+        if settings.ai_enabled:
+            assert application.state.session_factory is not None
+            assert settings.device_id is not None
+            assert settings.openai_api_key is not None
+            agent_service = AgentService(
+                application.state.session_factory,
+                settings.device_id,
+                settings.openai_model,
+                OpenAIAgentsBackend(
+                    settings.openai_model,
+                    settings.openai_api_key.get_secret_value(),
+                ),
+            )
+            application.state.agent_handler = agent_service.run
         application.mount(
             "/static",
             StaticFiles(directory=Path(__file__).parent / "web" / "static"),
