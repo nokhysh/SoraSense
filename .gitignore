@@ -5,3 +5,5 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+firmware/.pio/
+firmware/include/device_secrets.h
