@@ -150,7 +150,7 @@ def _delete_session_cookie(response: Response, settings: Settings) -> None:
     response.delete_cookie(
         settings.web_session_cookie_name,
         path="/",
-        secure=settings.secure_web_cookie,
+        secure=False,
         httponly=True,
         samesite="lax",
     )
@@ -176,7 +176,7 @@ async def login_page(request: Request) -> Response:
         token,
         max_age=600,
         path="/login",
-        secure=_settings(request).secure_web_cookie,
+        secure=False,
         httponly=True,
         samesite="lax",
     )
@@ -237,7 +237,7 @@ async def login(request: Request) -> Response:
         _settings(request).web_session_cookie_name,
         session_id,
         path="/",
-        secure=_settings(request).secure_web_cookie,
+        secure=False,
         httponly=True,
         samesite="lax",
     )

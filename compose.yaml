@@ -9,7 +9,6 @@ services:
       APP_DEVICE_API_KEY_HASH: ${DEVICE_API_KEY_HASH:?DEVICE_API_KEY_HASH must be set}
       APP_WEB_USERNAME: ${WEB_USERNAME:?WEB_USERNAME must be set}
       APP_WEB_PASSWORD_HASH: ${WEB_PASSWORD_HASH:?WEB_PASSWORD_HASH must be set}
-      APP_WEB_SECURE_COOKIE: "false"
       APP_OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       APP_OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       APP_ALERTS__TEMPERATURE__LOWER: ${TEMPERATURE_LOWER:-10.0}
@@ -19,7 +18,7 @@ services:
       APP_ALERTS__HUMIDITY__UPPER: ${HUMIDITY_UPPER:-70.0}
       APP_ALERTS__HUMIDITY__HYSTERESIS: ${HUMIDITY_HYSTERESIS:-2.0}
     ports:
-      - "127.0.0.1:8000:8000"
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:8000:8000"
     networks:
       - backend
       - frontend
@@ -134,7 +133,7 @@ services:
       GRAFANA_READER_PASSWORD: ${GRAFANA_READER_PASSWORD:?GRAFANA_READER_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-sorasense}
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro

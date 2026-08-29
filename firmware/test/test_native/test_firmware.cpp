@@ -33,12 +33,11 @@ sorasense::DeviceConfig valid_config() {
     sorasense::DeviceConfig config;
     config.device_id = "living-room-01";
     config.device_api_key = "api-key";
-    config.api_base_url = "https://sorasense.example.com";
+    config.api_base_url = "http://192.168.1.100:8000";
     config.wifi_ssid = "ssid";
     config.wifi_password = "password";
     config.ntp_server_1 = "ntp1.example.com";
     config.ntp_server_2 = "ntp2.example.com";
-    config.server_ca_certificate = "-----BEGIN CERTIFICATE-----\ntest";
     return config;
 }
 
@@ -242,23 +241,33 @@ void test_authentication_error_discards_pending() {
 void test_validates_required_device_configuration_without_secret_output() {
     auto config = valid_config();
     TEST_ASSERT_TRUE(sorasense::is_valid_device_config(config));
+    config.api_base_url = "http://10.0.0.1:8000";
+    TEST_ASSERT_TRUE(sorasense::is_valid_device_config(config));
+    config.api_base_url = "http://172.31.255.254:8000/";
+    TEST_ASSERT_TRUE(sorasense::is_valid_device_config(config));
 
     config.device_id = "Invalid_Device";
     TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
     config = valid_config();
-    config.api_base_url = "http://sorasense.example.com";
+    config.api_base_url = "https://192.168.1.100:8000";
     TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
     config = valid_config();
-    config.api_base_url = "https://";
+    config.api_base_url = "http://127.0.0.1:8000";
+    TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
+    config = valid_config();
+    config.api_base_url = "http://8.8.8.8:8000";
+    TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
+    config = valid_config();
+    config.api_base_url = "http://192.168.1.100";
+    TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
+    config = valid_config();
+    config.api_base_url = "http://192.168.1.100:8080";
     TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
     config = valid_config();
     config.wifi_password = "";
     TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
     config = valid_config();
     config.ntp_server_2 = "";
-    TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
-    config = valid_config();
-    config.server_ca_certificate = "";
     TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
 }
 

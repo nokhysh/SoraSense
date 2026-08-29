@@ -274,7 +274,7 @@ M5StickC Plus2とENV IV Unitから、60秒周期で安全かつ継続的に測�
 - `StatusDisplay`を実装する。
 - `AppController`を実装する。
 - NTP同期とUTC日時生成を実装する。
-- CA証明書検証付きHTTPS通信を実装する。
+- 管理対象LAN内のFastAPIへHTTP送信する。
 - 非ブロッキングな計測と再送を実装する。
 - 指数バックオフとジッターを実装する。
 - 認証失敗時に自動送信を停止する。
@@ -285,7 +285,7 @@ M5StickC Plus2とENV IV Unitから、60秒周期で安全かつ継続的に測�
 - 再送待機中も計測ループが停止しない。
 - 同じ測定の再送で`message_id`が変わらない。
 - 時刻を保証できない状態では送信しない。
-- TLS検証を無効化する`setInsecure`を使用しない。
+- `localhost`ではなく、M5StickC Plus2から到達可能なホストのLANアドレスへ送信する。
 - `UT-DEV-001`、`UT-DEV-002`、`E2E-001`および`E2E-006`が成功する。
 
 ### 10.4 実装上の注意
@@ -300,7 +300,7 @@ M5StickC Plus2とENV IV Unitから、60秒周期で安全かつ継続的に測�
 
 ### 11.2 主な作業
 
-- Reverse ProxyとHTTPSを構成する。
+- FastAPIをホストの特定LANアドレスへ公開し、ファイアウォールで管理対象LANだけに制限する。
 - frontendネットワークとbackendネットワークを分離する。
 - コンテナを可能な限り非root化し、権限を削減する。
 - Secret注入方式を構成する。
@@ -318,6 +318,7 @@ M5StickC Plus2とENV IV Unitから、60秒周期で安全かつ継続的に測�
 - 24時間相当1,440件のデータを欠損・重複なく処理する。
 - OpenAI API、PostgreSQL、FastAPIおよびGrafanaの個別停止試験に合格する。
 - バックアップを隔離したPostgreSQLへ復元できる。
+- appとGrafanaが設計したローカルアドレスだけへ公開され、インターネットから直接アクセスできない。
 - AC-001～AC-011をすべて満たす。
 
 ### 11.4 対応設計

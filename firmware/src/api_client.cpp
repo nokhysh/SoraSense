@@ -7,7 +7,7 @@
 
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
-#include <WiFiClientSecure.h>
+#include <WiFiClient.h>
 
 namespace sorasense {
 namespace {
@@ -53,8 +53,7 @@ SendResult ApiClient::send(const Measurement& measurement) const {
     String payload;
     serializeJson(document, payload);
 
-    WiFiClientSecure secure_client;
-    secure_client.setCACert(config_.server_ca_certificate);
+    WiFiClient client;
 
     HTTPClient http;
     http.setConnectTimeout(5'000);
@@ -63,7 +62,7 @@ SendResult ApiClient::send(const Measurement& measurement) const {
     const char* response_headers[] = {"Retry-After"};
     http.collectHeaders(response_headers, 1U);
 
-    if (!http.begin(secure_client, measurement_url(config_))) {
+    if (!http.begin(client, measurement_url(config_))) {
         return classify_send_result(false, 0);
     }
     http.addHeader("Authorization", String("Bearer ") + config_.device_api_key);

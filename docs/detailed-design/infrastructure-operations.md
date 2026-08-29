@@ -4,19 +4,18 @@
 
 | Service | 公開 | 永続化 | 依存 |
 |---|---|---|---|
-| `reverse-proxy` | 443 | 証明書または証明書参照設定 | `app`, `grafana` |
-| `app` | 内部8000 | なし | `postgres` |
+| `app` | ホストのLANアドレス:8000 | なし | `postgres` |
 | `postgres` | 内部5432のみ | PostgreSQL data volume | なし |
-| `grafana` | 内部3000 | 原則不要、必要時のみvolume | `postgres` |
+| `grafana` | ホストのローカルアドレス:3000 | 原則不要、必要時のみvolume | `postgres` |
 | `backup` | 外部非公開 | 暗号化バックアップ保存先 | `postgres` |
 
 PostgreSQLをホストへ公開しない。`app`と`grafana`は別DBユーザーを使用する。コンテナは可能な限り非root、読み取り専用ルートファイルシステム、権限削減を適用する。
 
-## 3. ネットワークとHTTPS
+## 3. ローカルネットワークと外部通信
 
-`frontend`ネットワークにはProxy、app、Grafanaを、`backend`ネットワークにはapp、Grafana、PostgreSQLを接続する。PostgreSQLは`backend`だけに接続する。外部公開はProxyの443だけとし、80は443へのリダイレクトに限定する。
+`frontend`ネットワークにはappとGrafanaを、`backend`ネットワークにはapp、Grafana、PostgreSQLを接続する。PostgreSQLは`backend`だけに接続する。appの8000番ポートはM5StickC Plus2から到達可能なホストの特定LANアドレスへバインドし、`0.0.0.0`への無条件公開を避ける。Grafanaは利用するホストのローカルアドレスへバインドする。
 
-本番証明書は運用環境で信頼されたCAから取得し、自動更新する。TLS 1.2以上を許可する。Proxyは`X-Forwarded-Proto`等を上書きし、外部から受けた転送ヘッダーを信用しない。AI画面とGrafanaには別パスまたは別ホストを割り当てる。
+ホストのファイアウォールでappの8000番ポートへの接続元を管理対象LANに制限し、ルーターでインターネットからのポート転送を設定しない。ローカルのデバイス、AI質問画面およびGrafanaはHTTPを使用する。appからOpenAI APIへの外向き通信だけはHTTPSを使用し、証明書検証は利用ライブラリの既定動作を維持する。
 
 ## 4. 設定とSecret
 
@@ -25,7 +24,7 @@ PostgreSQLをホストへ公開しない。`app`と`grafana`は別DBユーザー
 | App | `DATABASE_URL`、`DEVICE_ID`、`APP_TIMEZONE`、`OPENAI_MODEL` |
 | Secret | `DEVICE_API_KEY_HASH`、`WEB_PASSWORD_HASH`、`OPENAI_API_KEY`、DBパスワード |
 | Grafana | 管理者認証、`grafana_reader`接続情報、公開URL |
-| Device | API URL、Wi-Fi、デバイスAPIキー、CA証明書 |
+| Device | ローカルHTTP API URL、Wi-Fi、デバイスAPIキー |
 
 Secret実値を`.env`、Composeファイル、Git履歴、ログへ登録しない。本番ではDocker Secretまたは同等のSecret機構を使用する。起動時には存在と形式だけを検証し、値は出力しない。Secret更新手順は、新値発行、対象サービス更新、動作確認、旧値失効の順とする。
 
@@ -64,7 +63,7 @@ Authorization、Cookie、APIキー、パスワード、DB接続文字列、セ�
 
 ## 7. 監視
 
-- Proxy、FastAPI、PostgreSQL、Grafanaのコンテナ状態を確認する。
+- FastAPI、PostgreSQL、Grafanaのコンテナ状態を確認する。
 - `/health/live`と`/health/ready`を60秒間隔で確認する。
 - 受信成功件数、拒否件数、最終受信時刻、デバイス状態を確認する。
 - Agent成功・失敗、トークン利用量、処理時間を確認する。
@@ -92,4 +91,4 @@ Authorization、Cookie、APIキー、パスワード、DB接続文字列、セ�
 
 ## 10. デプロイとロールバック
 
-リリース前に設定検証、テスト、DBバックアップを実行する。DB Migration、app、Grafana、Proxy設定の順に反映する。失敗時はアプリイメージを直前版へ戻す。DB downgradeがデータ損失を伴う場合は実行せず、バックアップから別DBへ復元して切り替える。
+リリース前に設定検証、テスト、DBバックアップを実行する。DB Migration、app、Grafana、LAN公開・ファイアウォール設定の順に反映する。失敗時はアプリイメージを直前版へ戻す。DB downgradeがデータ損失を伴う場合は実行せず、バックアップから別DBへ復元して切り替える。

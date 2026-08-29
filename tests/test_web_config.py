@@ -19,21 +19,20 @@ def test_web_routes_can_be_disabled_outside_production() -> None:
     settings = Settings(environment=Environment.TEST)
 
     assert settings.web_enabled is False
-    assert settings.secure_web_cookie is False
 
 
-def test_production_requires_web_credentials_and_secure_cookie() -> None:
-    """本番で認証設定不足とSecure無効化を拒否する。"""
+def test_production_requires_web_credentials() -> None:
+    """本番でWeb認証設定不足を拒否する。"""
 
     with pytest.raises(ValidationError):
         Settings(environment=Environment.PRODUCTION)
-    with pytest.raises(ValidationError):
-        Settings(
-            environment=Environment.PRODUCTION,
-            web_username="admin",
-            web_password_hash=SecretStr("hash"),
-            web_secure_cookie=False,
-        )
+
+    settings = Settings(
+        environment=Environment.PRODUCTION,
+        web_username="admin",
+        web_password_hash=SecretStr("hash"),
+    )
+    assert settings.web_enabled is True
 
 
 def test_absolute_session_lifetime_must_exceed_idle_lifetime() -> None:

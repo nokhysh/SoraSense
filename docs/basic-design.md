@@ -15,13 +15,14 @@ M5StickC Plus2による温湿度計測、HTTP APIによる収集、PostgreSQLへ
 - Grafanaは参照用VIEWをSELECT専用DBユーザーで参照する。
 - デバイスおよび監視条件を変更する画面・APIは提供しない。
 - 初期リリースは単一利用者、センサーデバイス1台とする。
+- 初期リリースは管理者が管理するローカルネットワーク内で運用し、ローカル通信にはHTTP、OpenAI APIとの外部通信にはHTTPSを使用する。
 - Docker Composeで開発環境と本番相当環境を再現可能にする。
 
 ### 2.3 技術構成
 
 | 区分 | 採用技術 | 主な責務 |
 |---|---|---|
-| センサーデバイス | M5StickC Plus2 / ENV IV Unit / Arduino | 温湿度取得、HTTPS送信、失敗時再送 |
+| センサーデバイス | M5StickC Plus2 / ENV IV Unit / Arduino | 温湿度取得、ローカルHTTP送信、失敗時再送 |
 | バックエンド | Python / FastAPI | 受信、検証、保存、異常判定、AI質問画面 |
 | DBアクセス | SQLAlchemy / Alembic | DBアクセス、スキーマ変更管理 |
 | データベース | PostgreSQL | 測定値、アラート、AI利用履歴の永続化と集計 |
@@ -36,11 +37,11 @@ M5StickC Plus2による温湿度計測、HTTP APIによる収集、PostgreSQLへ
 
 ```mermaid
 flowchart LR
-    M5["M5StickC Plus2 + ENV IV Unit"] -->|HTTPS| API["FastAPI"]
+    M5["M5StickC Plus2 + ENV IV Unit"] -->|ローカルHTTP| API["FastAPI"]
     API -->|検証・保存・異常判定| DB[(PostgreSQL)]
-    UI["Webブラウザ"] -->|HTTPS| GF["Grafana"]
+    UI["Webブラウザ"] -->|ローカルHTTP| GF["Grafana"]
     GF -->|参照用VIEW| DB
-    CHAT["AI質問画面"] -->|HTTPS| API
+    CHAT["AI質問画面"] -->|ローカルHTTP| API
     API --> AG["AI Agent"]
     AG -->|参照専用Tool| SV["照会サービス層"]
     SV --> DB
@@ -61,7 +62,7 @@ FastAPIは測定データ受信とAI質問を同一サービスで提供する�
 
 ### 3.3 配置方針
 
-Docker ComposeにFastAPI、PostgreSQL、Grafanaを配置する。外部通信はHTTPSとし、PostgreSQLは内部ネットワークだけに接続する。永続化対象はPostgreSQLデータとし、Grafana設定は構成ファイルから再生成可能にする。
+Docker ComposeにFastAPI、PostgreSQL、Grafanaを配置する。FastAPIはセンサーデバイスから到達可能なホストのLANアドレスへHTTPで公開し、GrafanaとAI質問画面も管理対象のローカルネットワーク内だけから利用する。PostgreSQLは内部ネットワークだけに接続する。OpenAI APIへの外部通信はHTTPSを使用する。永続化対象はPostgreSQLデータとし、Grafana設定は構成ファイルから再生成可能にする。
 
 ## 4. 機能・処理方式
 
@@ -91,7 +92,7 @@ AI質問は一問一答とし、過去の質問・回答を次の質問へ渡さ
 
 | インターフェース | 利用者 | 方式 | 目的 |
 |---|---|---|---|
-| 測定データ受付 | センサーデバイス | HTTPSのHTTP API、APIキー認証 | 測定値の検証・保存・異常判定 |
+| 測定データ受付 | センサーデバイス | ローカルHTTP API、APIキー認証 | 測定値の検証・保存・異常判定 |
 | AI質問 | 利用者 | Jinja2で生成するHTMLフォーム | 一問一答の質問と回答表示 |
 | ヘルスチェック | システム管理者 | 内部向けHTTP API | FastAPI、必要設定、DB接続の確認 |
 | データ閲覧 | 利用者 | Grafana | 現在値、履歴、集計、異常履歴、デバイス状態の表示 |
@@ -166,7 +167,8 @@ Grafanaは現在値、状態、時系列、統計、アラートを表示する�
 - AI質問画面は環境変数の単一利用者情報で認証し、セッションCookieとCSRF対策を用いる。
 - GrafanaとAI質問画面の認証情報は別々に管理する。
 - 秘密情報は環境変数またはSecret機構から取得し、ソースやログへ出力しない。
-- 本番通信はHTTPSとし、各構成要素には必要最小限の権限だけを付与する。
+- ローカルHTTPサービスは管理対象LANだけに公開し、ホストのバインド先とファイアウォールでインターネットからの直接アクセスを拒否する。
+- OpenAI APIとの外部通信はHTTPSとし、各構成要素には必要最小限の権限だけを付与する。
 
 具体的なハッシュ方式、Cookie属性、有効期限、環境変数名および制限値は詳細設計書で定義する。
 
@@ -212,7 +214,7 @@ CIでは静的解析、型チェック、単体・結合テスト、依存脆弱
 | FR-060～063 利用者UI | 5、8、9 | AC-002～004 |
 | NFR-001～003 性能 | 4、7、12、13 | AC-001、AC-005、AC-007 |
 | NFR-010～012 可用性 | 3、11～13 | AC-005、AC-008 |
-| NFR-020～024 セキュリティ | 5、6、9、10 | AC-009 |
+| NFR-020～025 セキュリティ・ネットワーク境界 | 3、5、6、9、10 | AC-009 |
 | NFR-030～033 信頼性 | 4、5、7、10 | AC-004、AC-006、AC-010 |
 | NFR-040～043 保守性 | 2、3、7、13 | AC-011 |
 | NFR-050～052 利用コスト | 4.5、6、7、10 | AC-004 |

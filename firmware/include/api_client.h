@@ -6,7 +6,7 @@
 
 namespace sorasense {
 
-/** CA検証付きHTTPSで測定データAPIを呼び出す。 */
+/** 管理対象LAN内のHTTP測定データAPIを呼び出す。 */
 class ApiClient {
 public:
     explicit ApiClient(const DeviceConfig& config);

@@ -14,9 +14,60 @@ bool has_prefix(const char* value, const char* prefix) {
         && std::strncmp(value, prefix, std::strlen(prefix)) == 0;
 }
 
-bool is_valid_https_url(const char* value) {
-    constexpr const char* scheme = "https://";
-    return has_prefix(value, scheme) && std::strlen(value) > std::strlen(scheme);
+bool parse_number(
+    const char*& cursor,
+    const unsigned int maximum,
+    unsigned int& result
+) {
+    if (*cursor < '0' || *cursor > '9') {
+        return false;
+    }
+    unsigned int value = 0U;
+    do {
+        const unsigned int digit = static_cast<unsigned int>(*cursor - '0');
+        if (value > (maximum - digit) / 10U) {
+            return false;
+        }
+        value = value * 10U + digit;
+        ++cursor;
+    } while (*cursor >= '0' && *cursor <= '9');
+    result = value;
+    return true;
+}
+
+bool is_private_ipv4(const unsigned int octets[4]) {
+    return octets[0] == 10U
+        || (octets[0] == 172U && octets[1] >= 16U && octets[1] <= 31U)
+        || (octets[0] == 192U && octets[1] == 168U);
+}
+
+bool is_valid_local_http_url(const char* value) {
+    constexpr const char* scheme = "http://";
+    if (!has_prefix(value, scheme)) {
+        return false;
+    }
+
+    const char* cursor = value + std::strlen(scheme);
+    unsigned int octets[4] = {};
+    for (std::size_t index = 0U; index < 4U; ++index) {
+        if (!parse_number(cursor, 255U, octets[index])) {
+            return false;
+        }
+        const char expected_separator = index < 3U ? '.' : ':';
+        if (*cursor != expected_separator) {
+            return false;
+        }
+        ++cursor;
+    }
+
+    unsigned int port = 0U;
+    if (!parse_number(cursor, 65'535U, port) || port != 8'000U) {
+        return false;
+    }
+    while (*cursor == '/') {
+        ++cursor;
+    }
+    return *cursor == '\0' && is_private_ipv4(octets);
 }
 
 bool is_valid_device_id(const char* value) {
@@ -42,10 +93,9 @@ bool is_valid_device_id(const char* value) {
 
 bool is_valid_device_config(const DeviceConfig& config) {
     return is_valid_device_id(config.device_id) && has_value(config.device_api_key)
-        && is_valid_https_url(config.api_base_url) && has_value(config.wifi_ssid)
+        && is_valid_local_http_url(config.api_base_url) && has_value(config.wifi_ssid)
         && has_value(config.wifi_password) && has_value(config.ntp_server_1)
-        && has_value(config.ntp_server_2)
-        && has_prefix(config.server_ca_certificate, "-----BEGIN CERTIFICATE-----");
+        && has_value(config.ntp_server_2);
 }
 
 }  // namespace sorasense

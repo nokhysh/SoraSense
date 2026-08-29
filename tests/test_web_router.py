@@ -76,10 +76,12 @@ def test_login_regenerates_session_and_sets_security_headers() -> None:
 
     assert response.status_code == 303
     cookie = response.headers["set-cookie"]
+    assert "Secure" not in cookie
     assert "HttpOnly" in cookie
     assert "SameSite=lax" in cookie
     agent = client.get("/agent")
     assert agent.status_code == 200
+    assert 'href="http://localhost:3000/"' in agent.text
     assert agent.headers["Cache-Control"] == "no-store"
     assert "frame-ancestors 'none'" in agent.headers["Content-Security-Policy"]
 

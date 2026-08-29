@@ -38,10 +38,6 @@
 #define SORASENSE_NTP_SERVER_3 ""
 #endif
 
-#ifndef SORASENSE_SERVER_CA_CERT
-#define SORASENSE_SERVER_CA_CERT ""
-#endif
-
 namespace sorasense {
 
 /** 実機設定と、設計で定めた固定の制御値を保持する。 */
@@ -54,7 +50,6 @@ struct DeviceConfig {
     const char* ntp_server_1 = SORASENSE_NTP_SERVER_1;
     const char* ntp_server_2 = SORASENSE_NTP_SERVER_2;
     const char* ntp_server_3 = SORASENSE_NTP_SERVER_3;
-    const char* server_ca_certificate = SORASENSE_SERVER_CA_CERT;
 
     std::uint32_t measurement_interval_ms = 60'000U;
     std::uint32_t sensor_retry_interval_ms = 30'000U;

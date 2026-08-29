@@ -11,7 +11,7 @@ PlatformIOのボード定義は、M5Stack公式`M5UnitUnified`が提供するM5S
 | `SensorReader` | ENV IVの初期化、SHT40測定値の取得 |
 | `ClockService` | NTP同期、UTC生成、時刻保証期限の管理 |
 | `MeasurementFactory` | UUID v4と送信データの生成 |
-| `ApiClient` | CA検証付きHTTPS送信、HTTP結果の分類 |
+| `ApiClient` | 管理対象LAN内へのHTTP送信、HTTP結果の分類 |
 | `RetryController` | 最新未送信データ、再送回数、バックオフの管理 |
 | `StatusDisplay` | 測定値と接続・送信状態の端末表示 |
 | `AppController` | 初期化、60秒計測、再接続、再送のスケジュール制御 |
@@ -22,13 +22,11 @@ PlatformIOのボード定義は、M5Stack公式`M5UnitUnified`が提供するM5S
 `device_secrets.h`はGit管理対象外である。
 
 - デバイスIDとAPIキー
-- APIのHTTPSベースURL
+- M5StickC Plus2から到達可能なMacのHTTPベースURL
 - Wi-FiのSSIDとパスワード
 - 2つ以上のNTPサーバー
-- APIサーバー証明書を検証するCA証明書
 
-CA証明書は公開情報だが接続先ごとに異なるため、Secretと同じ非公開設定ファイルから注入する。
-TLS検証を無効化する設定は用意していない。
+API URLは`http://{MacのプライベートIPv4}:8000`形式で指定する。`localhost`と`127.0.0.1`はM5StickC Plus2自身を指すため使用しない。公開インターネットへAPIキーを送らないよう、プライベートIPv4以外の送信先は設定検証で拒否する。
 
 ## 検証
 

@@ -26,7 +26,7 @@
 | `app/security/web_auth.py` | 固定利用者名とArgon2idハッシュの定時間認証 | Cookie発行、HTTP応答 |
 | `app/security/session.py` | セッション生成、取得、更新、失効、CSRF・フォームトークン管理 | HTTP、HTML、Agent処理 |
 | `app/security/login_rate_limit.py` | IP・利用者名単位の試行記録と制限判定 | 認証情報の検証 |
-| `app/security/headers.py` | AI画面応答へのセキュリティヘッダー付与 | HTTPS終端、HSTS付与 |
+| `app/security/headers.py` | AI画面応答へのセキュリティヘッダー付与 | HTTP応答生成 |
 
 セッションストアとレート制限ストアは初期リリースではプロセス内メモリに保持する。FastAPIは単一ワーカープロセスで稼働し、再起動時には全セッションと試行履歴を失効させる。複数ワーカー化する場合は共有ストアへ置き換え、プロセスローカル状態のままスケールアウトしない。
 
@@ -45,7 +45,6 @@
 | `APP_WEB_LOGIN_MAX_ATTEMPTS` | `5` | 制限開始前に許可する失敗回数 |
 | `APP_WEB_LOGIN_LOCK_SECONDS` | `900` | 制限時間 |
 | `APP_WEB_FORM_MAX_BYTES` | `4096` | ログイン・質問フォーム共通の本文上限 |
-| `APP_WEB_SECURE_COOKIE` | 本番`true`、開発・テスト`false`可 | 本番で`false`なら起動失敗 |
 
 Web UIは利用者名とパスワードハッシュの両方が設定された場合だけ有効とする。片方だけの設定は全環境で起動時エラーとする。本番環境では両方を必須とする。開発・テストで両方が未設定の場合はWeb経路を登録せず、測定APIとヘルスチェックだけを利用可能にする。
 
@@ -79,13 +78,13 @@ Web UIは利用者名とパスワードハッシュの両方が設定された�
 
 ### 6.2 ログインCSRF
 
-ログインCSRFは、GET `/login`で発行する短命な署名付きトークンをCookieとhidden fieldの二重送信方式で検証する。Cookieは認証セッションCookieと別名にし、`Secure`、`HttpOnly`、`SameSite=Lax`、`Path=/login`、有効期限10分とする。サーバー秘密鍵はプロセス起動時に生成するため、再起動後のトークンは無効となる。これにより、認証前にもログインCSRFを防ぎつつ、ログイン用のサーバー側セッションは作成しない。
+ログインCSRFは、GET `/login`で発行する短命な署名付きトークンをCookieとhidden fieldの二重送信方式で検証する。Cookieは認証セッションCookieと別名にし、`HttpOnly`、`SameSite=Lax`、`Path=/login`、有効期限10分とし、ローカルHTTP運用では`Secure`を付与しない。サーバー秘密鍵はプロセス起動時に生成するため、再起動後のトークンは無効となる。これにより、認証前にもログインCSRFを防ぎつつ、ログイン用のサーバー側セッションは作成しない。
 
 ### 6.3 レート制限
 
 接続元IPと利用者名のどちらか一方が、15分窓で5回失敗した後は15分間制限する。制限中はパスワード検証を行わず429と`Retry-After`を返す。成功時は該当する両キーの失敗履歴を消去する。履歴は期限切れエントリを各判定時に削除し、最大10,000キーを超えた場合は最終更新が古い期限切れキーから削除する。
 
-接続元IPは、信頼済みReverse Proxyが上書きした接続情報だけを用いる。任意クライアントから届く`X-Forwarded-For`を直接信用しない。IPと利用者名は平文でログへ出さず、それぞれ種別を分けた鍵付きハッシュで記録する。
+接続元IPはASGIサーバーが取得した直接接続元を用い、任意クライアントから届く`X-Forwarded-For`を信用しない。IPと利用者名は平文でログへ出さず、それぞれ種別を分けた鍵付きハッシュで記録する。
 
 ## 7. セッション設計
 
@@ -120,7 +119,7 @@ stateDiagram-v2
 
 ### 7.3 Cookie属性
 
-セッションCookieは`Secure`、`HttpOnly`、`SameSite=Lax`、`Path=/`を付与し、`Domain`は設定しない。ブラウザ終了時に破棄されるセッションCookieとし、サーバー側期限を正本にする。開発・テストでHTTPを使う場合だけ`Secure=false`を許可し、本番では必ず`true`とする。
+セッションCookieは`HttpOnly`、`SameSite=Lax`、`Path=/`を付与し、`Domain`は設定しない。ローカルHTTP運用では`Secure`を付与しない。ブラウザ終了時に破棄されるセッションCookieとし、サーバー側期限を正本にする。将来HTTPSへ移行する場合は`Secure`を必須へ変更する。
 
 ## 8. CSRFとワンタイムフォームトークン
 
@@ -189,7 +188,7 @@ AI画面のHTML・リダイレクト・エラー応答へ次を付与する。
 | `Cache-Control` | `no-store` |
 | `X-Frame-Options` | `DENY` |
 
-HTTPS終端では`Strict-Transport-Security: max-age=31536000; includeSubDomains`をReverse Proxyが付与する。テンプレートにインラインスクリプト、インラインスタイルおよび外部CDN参照を置かない。
+HTTP運用では効果がなく誤設定となるため`Strict-Transport-Security`を付与しない。テンプレートにインラインスクリプト、インラインスタイルおよび外部CDN参照を置かない。
 
 ## 12. ログ設計
 
@@ -242,7 +241,7 @@ PostgreSQLデータソースは`grafana_reader`を使用し、`reporting`スキ�
 | 設計項目 | 対応要件・受入条件 |
 |---|---|
 | 画面・経路・相互リンク | FR-040、FR-060～063、AC-002、AC-004 |
-| 認証・セッション・CSRF・レート制限 | NFR-020～024、AC-009 |
+| 認証・セッション・CSRF・レート制限 | NFR-020～025、AC-009 |
 | 入力境界・安全な表示 | FR-040、NFR-022、NFR-024、AC-004、AC-009 |
 | Agent障害時表示 | FR-048、NFR-002、NFR-011、AC-005 |
 | Grafana参照専用構成 | FR-020～023、FR-032、FR-050～052、AC-002、AC-003、AC-006 |

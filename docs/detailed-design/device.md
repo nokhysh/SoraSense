@@ -7,7 +7,7 @@
 | `SensorReader` | ENV IV Unitの初期化、温度・湿度取得、読取値の有限値・範囲確認 |
 | `ClockService` | NTP同期、UTC測定日時の生成、未同期状態の管理 |
 | `MeasurementFactory` | UUID v4生成、送信ペイロード作成 |
-| `ApiClient` | HTTPS接続、JSON送信、応答分類 |
+| `ApiClient` | ローカルHTTP接続、JSON送信、応答分類 |
 | `RetryController` | 未送信データ1件の保持、バックオフ、再送打切り |
 | `StatusDisplay` | 接続・送信・認証・センサー異常の端末表示 |
 | `AppController` | 初期化と非ブロッキングな計測・送信ループの制御 |
@@ -19,13 +19,12 @@
 | 本体・画面 | M5Stack公式のM5StickC Plus2対応ライブラリ |
 | ENV IV Unit | M5Stack公式ENV IV Unit対応ライブラリ |
 | Wi-Fi | Arduino-ESP32 `WiFi` |
-| HTTPS | Arduino-ESP32 `WiFiClientSecure`、サーバーCA証明書検証を必須とする |
-| HTTP | Arduino-ESP32 `HTTPClient` |
+| HTTP | Arduino-ESP32 `WiFiClient`と`HTTPClient` |
 | JSON | ArduinoJson |
 | 時刻同期 | Arduino-ESP32 `configTzTime`または`configTime`によるNTP |
 | UUID | 暗号学的乱数源`esp_random`を用いたRFC 4122 UUID v4生成 |
 
-具体的なライブラリバージョンはファームウェアの依存定義に固定する。証明書検証を無効化する`setInsecure`は使用しない。
+具体的なライブラリバージョンはファームウェアの依存定義に固定する。送信先は管理対象LAN内のFastAPIに限定し、`http://{host-lan-address}:8000`形式のベースURLを環境別設定として注入する。M5StickC Plus2自身を指す`localhost`または`127.0.0.1`は指定しない。
 
 ## 4. 起動シーケンス
 
@@ -105,7 +104,7 @@ APIキーを画面、シリアルログ、エラー本文へ出力しない。
 
 ## 10. 設定値
 
-`DEVICE_ID`、`DEVICE_API_KEY`、`API_BASE_URL`、NTPサーバー、Wi-Fi認証情報をビルド時Secretまたは端末用の非公開設定で注入する。リポジトリへ実値を登録しない。
+`DEVICE_ID`、`DEVICE_API_KEY`、HTTPの`API_BASE_URL`、NTPサーバー、Wi-Fi認証情報をビルド時Secretまたは端末用の非公開設定で注入する。CA証明書は使用しない。リポジトリへ実値を登録しない。
 
 ## 11. ログと端末表示
 
