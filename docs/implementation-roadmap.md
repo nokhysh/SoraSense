@@ -223,7 +223,7 @@ AI Agentを接続する前に、Web画面の安全な認証、セッションお
 
 ### 9.2 主な作業
 
-- OpenAI Agents SDKを導入する。
+- Google Gen AI SDKを導入し、Gemini Interactions APIへ接続する。
 - 5種類の参照専用Toolを作成する。
 - Agent Instructionsを作成する。
 - Tool呼出し回数、ターン数および処理時間の上限を実装する。
@@ -247,8 +247,8 @@ AI Agentを接続する前に、Web画面の安全な認証、セッションお
 
 - AgentへDB接続、任意SQL、任意URLおよび更新操作を公開しない。
 - Tool結果に存在しない数値を含む回答を表示しない。
-- 入力検証で拒否した質問ではOpenAI APIを呼び出さない。
-- OpenAI停止中も測定収集とGrafana閲覧が継続する。
+- 入力検証で拒否した質問ではGemini Developer APIを呼び出さない。
+- Gemini停止中またはFree Tier上限到達中も測定収集とGrafana閲覧が継続する。
 - `UT-AI-001`～`UT-AI-003`、`IT-008`、`IT-013`および`E2E-003`が成功する。
 
 ### 9.5 対応要件・受入条件
@@ -316,7 +316,7 @@ M5StickC Plus2とENV IV Unitから、60秒周期で安全かつ継続的に測�
 - Docker Composeから全サービスを再現できる。
 - 30日分43,200件のデータで表示性能要件を満たす。
 - 24時間相当1,440件のデータを欠損・重複なく処理する。
-- OpenAI API、PostgreSQL、FastAPIおよびGrafanaの個別停止試験に合格する。
+- Gemini Developer API、PostgreSQL、FastAPIおよびGrafanaの個別停止試験に合格する。
 - バックアップを隔離したPostgreSQLへ復元できる。
 - appとGrafanaが設計したローカルアドレスだけへ公開され、インターネットから直接アクセスできない。
 - AC-001～AC-011をすべて満たす。

@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.agent.backend import OpenAIAgentsBackend
+from app.agent.backend import GeminiBackend
 from app.agent.service import AgentService
 from app.api.health_router import router as health_router
 from app.api.measurement_router import router as measurement_router
@@ -65,14 +65,14 @@ def create_app(settings: Settings) -> FastAPI:
         if settings.ai_enabled:
             assert application.state.session_factory is not None
             assert settings.device_id is not None
-            assert settings.openai_api_key is not None
+            assert settings.gemini_api_key is not None
             agent_service = AgentService(
                 application.state.session_factory,
                 settings.device_id,
-                settings.openai_model,
-                OpenAIAgentsBackend(
-                    settings.openai_model,
-                    settings.openai_api_key.get_secret_value(),
+                settings.gemini_model,
+                GeminiBackend(
+                    settings.gemini_model,
+                    settings.gemini_api_key.get_secret_value(),
                 ),
             )
             application.state.agent_handler = agent_service.run

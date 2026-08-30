@@ -15,18 +15,18 @@ PostgreSQLをホストへ公開しない。`app`と`grafana`は別DBユーザー
 
 `frontend`ネットワークにはappとGrafanaを、`backend`ネットワークにはapp、Grafana、PostgreSQLを接続する。PostgreSQLは`backend`だけに接続する。appの8000番ポートはM5StickC Plus2から到達可能なホストの特定LANアドレスへバインドし、`0.0.0.0`への無条件公開を避ける。Grafanaは利用するホストのローカルアドレスへバインドする。
 
-ホストのファイアウォールでappの8000番ポートへの接続元を管理対象LANに制限し、ルーターでインターネットからのポート転送を設定しない。ローカルのデバイス、AI質問画面およびGrafanaはHTTPを使用する。appからOpenAI APIへの外向き通信だけはHTTPSを使用し、証明書検証は利用ライブラリの既定動作を維持する。
+ホストのファイアウォールでappの8000番ポートへの接続元を管理対象LANに制限し、ルーターでインターネットからのポート転送を設定しない。ローカルのデバイス、AI質問画面およびGrafanaはHTTPを使用する。appからGemini Developer APIへの外向き通信だけはHTTPSを使用し、証明書検証はGoogle Gen AI SDKの既定動作を維持する。
 
 ## 4. 設定とSecret
 
 | 分類 | 主な設定 |
 |---|---|
-| App | `DATABASE_URL`、`DEVICE_ID`、`APP_TIMEZONE`、`OPENAI_MODEL` |
-| Secret | `DEVICE_API_KEY_HASH`、`WEB_PASSWORD_HASH`、`OPENAI_API_KEY`、DBパスワード |
+| App | `DATABASE_URL`、`DEVICE_ID`、`APP_TIMEZONE`、`GEMINI_MODEL` |
+| Secret | `DEVICE_API_KEY_HASH`、`WEB_PASSWORD_HASH`、`GEMINI_API_KEY`、DBパスワード |
 | Grafana | 管理者認証、`grafana_reader`接続情報、公開URL |
 | Device | ローカルHTTP API URL、Wi-Fi、デバイスAPIキー |
 
-Secret実値を`.env`、Composeファイル、Git履歴、ログへ登録しない。本番ではDocker Secretまたは同等のSecret機構を使用する。起動時には存在と形式だけを検証し、値は出力しない。Secret更新手順は、新値発行、対象サービス更新、動作確認、旧値失効の順とする。
+Secret実値をGit管理対象のファイル、Composeファイル、Git履歴およびログへ登録しない。ローカル検証ではGit管理外の`.env`を使用し、Argon2idハッシュは`$`をComposeに展開させないよう値全体を一重引用符で囲む。本番ではDocker Secretまたは同等のSecret機構を使用する。起動時には存在と形式だけを検証し、値は出力しない。Secret更新手順は、新値発行、対象サービス更新、動作確認、旧値失効の順とする。
 
 ## 5. 構造化ログ
 
@@ -57,7 +57,7 @@ Authorization、Cookie、APIキー、パスワード、DB接続文字列、セ�
 | `alert.opened` / `alert.resolved` | アラート状態変更 |
 | `agent.completed` / `agent.failed` | AI質問終了 |
 | `authentication.succeeded` / `authentication.failed` | Web認証結果 |
-| `dependency.unavailable` | DBまたはOpenAI利用不能 |
+| `dependency.unavailable` | DBまたはGemini利用不能 |
 | `health.ready.failed` | Ready確認失敗 |
 | `backup.completed` / `backup.failed` | バックアップ結果 |
 

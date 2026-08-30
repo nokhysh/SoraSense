@@ -7,10 +7,10 @@ from collections.abc import Callable
 from time import monotonic
 from uuid import UUID
 
-from openai import APIConnectionError, InternalServerError, RateLimitError
 from sqlalchemy.orm import Session
 
-from app.agent.backend import AgentBackend
+from app.agent.backend import AgentBackend, AgentTurnLimitExceeded
+from app.agent.gemini_compat import GeminiAPIConnectionError, GeminiAPIError
 from app.agent.schemas import AgentRunResult
 from app.agent.tools import ReadOnlyTools, ToolLimitExceeded
 from app.agent.validation import AgentResponseInvalid, validate_and_build_display
@@ -18,7 +18,7 @@ from app.repositories.ai_request_repository import AIRequestRepository
 from app.web.schemas import AgentDisplayResult
 
 SessionFactory = Callable[[], Session]
-TRANSIENT_OPENAI_ERRORS = (APIConnectionError, RateLimitError, InternalServerError)
+TRANSIENT_GEMINI_STATUS_CODES = frozenset({408, 429})
 logger = logging.getLogger("sorasense.agent")
 
 
@@ -86,7 +86,7 @@ class AgentService:
                 started_at=started_at,
             )
             raise AgentUnavailable("agent execution limit exceeded") from error
-        except ToolLimitExceeded as error:
+        except (AgentTurnLimitExceeded, ToolLimitExceeded) as error:
             self._record_failure(
                 request.id,
                 "LIMIT_EXCEEDED",
@@ -119,7 +119,16 @@ class AgentService:
     ) -> AgentRunResult:
         try:
             return await self._backend.run(question, tools)
-        except TRANSIENT_OPENAI_ERRORS:
+        except GeminiAPIError as error:
+            status_code = error.status_code
+            is_transient = (
+                isinstance(error, GeminiAPIConnectionError)
+                or status_code in TRANSIENT_GEMINI_STATUS_CODES
+                or status_code is not None
+                and 500 <= status_code <= 599
+            )
+            if not is_transient:
+                raise
             # Tool実行後の再試行は、前回結果と新しい実行を混在させるため行わない。
             if tools.history:
                 raise

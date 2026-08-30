@@ -36,7 +36,7 @@
 | IT-005 | 異常開始・継続・復帰・再発 | OPEN重複なし、履歴2件 |
 | IT-006 | Grafanaユーザー権限 | VIEW SELECT成功、基底表SELECT/UPDATE失敗 |
 | IT-007 | Migration | 空DBへのupgrade、直前版からupgrade、downgrade検証 |
-| IT-008 | OpenAI停止 | Agentはエラー、測定登録とGrafana照会は成功 |
+| IT-008 | Gemini停止またはFree Tier上限到達 | Agentはエラー、測定登録とGrafana照会は成功し、有料枠へ切り替わらない |
 | IT-009 | 登録直後で測定実績なし | デバイス状態VIEWが対象デバイスをOFFLINEで1行返す |
 | IT-010 | 測定時刻が60秒周期から欠落 | 欠損VIEWとGrafanaに区間・推定欠損件数を表示する |
 | IT-011 | 最新判定済み時刻以前の測定が遅延到着 | 測定は保存するが、OPEN・RESOLVED状態と最新判定済み時刻を変更しない |
@@ -105,7 +105,7 @@
 
 ## 8. 障害・復旧テスト
 
-PostgreSQL、FastAPI、Grafana、OpenAI APIを個別に停止し、他機能への影響範囲が基本設計どおり分離されることを確認する。PostgreSQL停止では保存済みvolumeを維持して再起動し、データ保持を確認する。バックアップを隔離DBへ復元し、テーブル、VIEW、権限、最新値を照合してRPO・RTOを記録する。
+PostgreSQL、FastAPI、Grafana、Gemini Developer APIを個別に停止し、他機能への影響範囲が基本設計どおり分離されることを確認する。Geminiでは接続不能、401、429および5xxをFakeで再現し、429時に有料枠へ切り替わらないことを確認する。PostgreSQL停止では保存済みvolumeを維持して再起動し、データ保持を確認する。バックアップを隔離DBへ復元し、テーブル、VIEW、権限、最新値を照合してRPO・RTOを記録する。
 
 ## 9. 受入条件対応
 

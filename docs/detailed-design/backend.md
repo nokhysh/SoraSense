@@ -160,8 +160,8 @@ OPENアラートが存在する場合は、最初に現在の異常状態が復�
 | `GET /health/live` | FastAPIプロセス | 200 | 接続不能 |
 | `GET /health/ready` | 必須設定、DBへ`SELECT 1` | 200 | 503 |
 
-OpenAI APIは収集・閲覧の準備完了条件に含めない。内部ネットワークからのみ到達可能にする。
+Gemini Developer APIは収集・閲覧の準備完了条件に含めず、障害時もデバイスからの収集とGrafanaでの閲覧を継続する。FastAPIの公開範囲は内部ネットワークに限定する。
 
 ## 9. 例外処理
 
-ドメイン例外を`ValidationError`、`AuthenticationError`、`RateLimitError`、`DependencyUnavailableError`へ分類し、共通例外HandlerでHTTPへ変換する。DB例外はRepository境界で分類し、OpenAI例外はAgent境界で処理する。全例外にリクエストIDを付与する。
+ドメイン例外を`ValidationError`、`AuthenticationError`、`RateLimitError`、`DependencyUnavailableError`へ分類し、共通例外HandlerでHTTPへ変換する。DB例外はRepository境界で分類し、Gemini例外はAgent境界で処理する。全例外にリクエストIDを付与する。

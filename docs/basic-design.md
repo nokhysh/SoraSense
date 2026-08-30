@@ -4,7 +4,7 @@
 
 ### 2.1 対象範囲
 
-M5StickC Plus2による温湿度計測、HTTP APIによる収集、PostgreSQLへの保存、Grafanaによる閲覧、異常検知、OpenAI Agents SDKによる自然言語照会を対象とする。
+M5StickC Plus2による温湿度計測、HTTP APIによる収集、PostgreSQLへの保存、Grafanaによる閲覧、異常検知、Gemini Developer APIによる自然言語照会を対象とする。
 
 ### 2.2 基本方針
 
@@ -15,7 +15,8 @@ M5StickC Plus2による温湿度計測、HTTP APIによる収集、PostgreSQLへ
 - Grafanaは参照用VIEWをSELECT専用DBユーザーで参照する。
 - デバイスおよび監視条件を変更する画面・APIは提供しない。
 - 初期リリースは単一利用者、センサーデバイス1台とする。
-- 初期リリースは管理者が管理するローカルネットワーク内で運用し、ローカル通信にはHTTP、OpenAI APIとの外部通信にはHTTPSを使用する。
+- 初期リリースは管理者が管理するローカルネットワーク内で運用し、ローカル通信にはHTTP、Gemini Developer APIとの外部通信にはHTTPSを使用する。
+- AI Agentは課金を有効化していないGemini Developer APIのFree Tierを使用し、有料枠へ自動切替しない。
 - Docker Composeで開発環境と本番相当環境を再現可能にする。
 
 ### 2.3 技術構成
@@ -26,7 +27,7 @@ M5StickC Plus2による温湿度計測、HTTP APIによる収集、PostgreSQLへ
 | バックエンド | Python / FastAPI | 受信、検証、保存、異常判定、AI質問画面 |
 | DBアクセス | SQLAlchemy / Alembic | DBアクセス、スキーマ変更管理 |
 | データベース | PostgreSQL | 測定値、アラート、AI利用履歴の永続化と集計 |
-| AI Agent | OpenAI Agents SDK | Tool選択、回答生成、利用量記録 |
+| AI Agent | Google Gen AI SDK / Gemini Developer API | Tool選択、回答生成、利用量記録 |
 | 可視化UI | Grafana OSS | 現在値、履歴、統計、アラート、デバイス状態の閲覧 |
 | AI質問UI | FastAPI / Jinja2 / HTMLフォーム / CSS | 質問入力、回答と根拠の表示 |
 | 実行環境 | Docker / Docker Compose | 環境再現、サービス管理 |
@@ -45,10 +46,10 @@ flowchart LR
     API --> AG["AI Agent"]
     AG -->|参照専用Tool| SV["照会サービス層"]
     SV --> DB
-    AG -->|HTTPS| OA["OpenAI API"]
+    AG -->|HTTPS| GEMINI["Gemini Developer API<br/>Free Tier"]
 ```
 
-FastAPIは測定データ受信とAI質問を同一サービスで提供するが、ルーターとサービス層を分離する。測定データ受信処理はOpenAI APIを呼び出さない。Grafanaは独立サービスとする。
+FastAPIは測定データ受信とAI質問を同一サービスで提供するが、ルーターとサービス層を分離する。測定データ受信処理はGemini Developer APIを呼び出さない。Grafanaは独立サービスとする。
 
 ### 3.2 構成要素と責務
 
@@ -62,7 +63,7 @@ FastAPIは測定データ受信とAI質問を同一サービスで提供する�
 
 ### 3.3 配置方針
 
-Docker ComposeにFastAPI、PostgreSQL、Grafanaを配置する。FastAPIはセンサーデバイスから到達可能なホストのLANアドレスへHTTPで公開し、GrafanaとAI質問画面も管理対象のローカルネットワーク内だけから利用する。PostgreSQLは内部ネットワークだけに接続する。OpenAI APIへの外部通信はHTTPSを使用する。永続化対象はPostgreSQLデータとし、Grafana設定は構成ファイルから再生成可能にする。
+Docker ComposeにFastAPI、PostgreSQL、Grafanaを配置する。FastAPIはセンサーデバイスから到達可能なホストのLANアドレスへHTTPで公開し、GrafanaとAI質問画面も管理対象のローカルネットワーク内だけから利用する。PostgreSQLは内部ネットワークだけに接続する。Gemini Developer APIへの外部通信はHTTPSを使用する。永続化対象はPostgreSQLデータとし、Grafana設定は構成ファイルから再生成可能にする。
 
 ## 4. 機能・処理方式
 
@@ -168,7 +169,7 @@ Grafanaは現在値、状態、時系列、統計、アラートを表示する�
 - GrafanaとAI質問画面の認証情報は別々に管理する。
 - 秘密情報は環境変数またはSecret機構から取得し、ソースやログへ出力しない。
 - ローカルHTTPサービスは管理対象LANだけに公開し、ホストのバインド先とファイアウォールでインターネットからの直接アクセスを拒否する。
-- OpenAI APIとの外部通信はHTTPSとし、各構成要素には必要最小限の権限だけを付与する。
+- Gemini Developer APIとの外部通信はHTTPSとし、APIキーはFree Tierプロジェクトに限定する。Geminiへの送信内容は質問、Instructionsおよび回答に必要なTool結果だけに制限する。
 
 具体的なハッシュ方式、Cookie属性、有効期限、環境変数名および制限値は詳細設計書で定義する。
 
@@ -217,7 +218,7 @@ CIでは静的解析、型チェック、単体・結合テスト、依存脆弱
 | NFR-020～025 セキュリティ・ネットワーク境界 | 3、5、6、9、10 | AC-009 |
 | NFR-030～033 信頼性 | 4、5、7、10 | AC-004、AC-006、AC-010 |
 | NFR-040～043 保守性 | 2、3、7、13 | AC-011 |
-| NFR-050～052 利用コスト | 4.5、6、7、10 | AC-004 |
+| NFR-050～053 利用コスト | 4.5、6、7、10 | AC-004 |
 
 ## 15. 詳細設計への引継ぎ事項
 

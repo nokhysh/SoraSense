@@ -44,3 +44,17 @@ def test_absolute_session_lifetime_must_exceed_idle_lifetime() -> None:
             web_session_idle_seconds=1800,
             web_session_absolute_seconds=1800,
         )
+
+
+def test_ai_is_enabled_by_gemini_credentials_and_uses_free_tier_default() -> None:
+    """Gemini APIキー、DB、デバイスIDが揃った場合だけAIを有効化する。"""
+
+    settings = Settings(
+        environment=Environment.TEST,
+        database_url="postgresql://user:password@localhost/sorasense",
+        device_id="living-room-01",
+        gemini_api_key=SecretStr("test-key"),
+    )
+
+    assert settings.ai_enabled is True
+    assert settings.gemini_model == "gemini-3.7-flash"

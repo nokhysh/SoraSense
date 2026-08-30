@@ -6,7 +6,7 @@
 
 - 初期リリースは単一利用者、単一デバイス、温度・湿度の2測定項目を対象とする。
 - 日時は内部・API・DBでUTCを使用し、利用者への表示および日・時単位の集計境界は`Asia/Tokyo`に固定する。
-- データ収集経路はOpenAI APIへ依存させない。
+- データ収集経路はGemini Developer APIへ依存させない。
 - AI AgentおよびGrafanaには参照専用のデータ経路だけを提供する。
 - 秘密情報と環境差分はソースコードではなく環境変数、Secretまたは設定ファイルで管理する。
 - 本文に記載した制限値は初期値とし、環境変数または設定ファイルで変更可能な値は各文書に明記する。
@@ -20,7 +20,8 @@
 | PostgreSQL | 16系 |
 | Grafana OSS | 採用時のメジャー・マイナーバージョンをDockerイメージタグで固定する |
 | Arduinoライブラリ | `device.md`に定義したライブラリをバージョン固定する |
-| OpenAIモデル | `OPENAI_MODEL`で指定し、コードへモデル名を固定しない |
+| Gemini SDK | `google-genai==2.20.0`を依存管理ファイルで固定する |
+| Geminiモデル | Free Tier対象モデルを`GEMINI_MODEL`で指定し、既定値を`gemini-3.7-flash`とする |
 
 ## 4. 文書構成
 
@@ -67,7 +68,7 @@ flowchart LR
 | 分類 | 例 | 利用者向け処理 | ログレベル |
 |---|---|---|---|
 | 入力・認証エラー | 不正形式、CSRF不一致 | 4xxと安全な説明 | INFOまたはWARNING |
-| 一時的依存障害 | DB、OpenAI、通信 | 503または機能別エラー表示 | ERROR |
+| 一時的依存障害 | DB、Gemini、通信 | 503または機能別エラー表示 | ERROR |
 | 想定外障害 | 未処理例外 | 500とリクエストID | ERROR |
 
 内部例外、SQL、スタックトレース、秘密情報を外部応答へ含めない。
@@ -79,7 +80,7 @@ flowchart LR
 | FR-001～005、AC-001のデバイス部分 | `device.md` |
 | FR-004、FR-010～012、FR-030～034 | `backend.md`、`database.md` |
 | FR-013～023、FR-050～052 | `database.md`、`ui-grafana.md` |
-| FR-040～048、NFR-032、NFR-050～052 | `ai-agent.md`、`ui-grafana.md` |
+| FR-040～048、NFR-032、NFR-050～053 | `ai-agent.md`、`ui-grafana.md` |
 | FR-060～063 | `ui-grafana.md` |
 | NFR-001～003 | `backend.md`、`database.md`、`test-design.md` |
 | NFR-010～012 | `infrastructure-operations.md`、`test-design.md` |

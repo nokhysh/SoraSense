@@ -7,9 +7,9 @@ from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
-from httpx import Request, Response
-from openai import APITimeoutError, AuthenticationError
+from google.genai._gaos.lib.compat_errors import APIConnectionError, APIError
 from sqlalchemy.orm import Session
 
 from app.agent.schemas import (
@@ -207,11 +207,47 @@ class RetryBackend(FakeBackend):
         return await super().run(question, tools)
 
 
-def test_service_retries_transient_openai_error_once() -> None:
-    """接続・タイムアウト等の一時エラーだけを1回再試行する。"""
+def gemini_status_error(status_code: int) -> APIError:
+    """Interactions APIが返す実際の例外階層でHTTPエラーを作る。"""
+
+    request = httpx.Request("POST", "https://generativelanguage.googleapis.com/interactions")
+    response = httpx.Response(status_code, request=request)
+    return APIError.generate(
+        status_code,
+        {"error": {"message": "Gemini request failed"}},
+        None,
+        response,
+    )
+
+
+@pytest.mark.parametrize("status_code", [408, 429, 500, 501, 502, 503, 504, 599])
+def test_service_retries_transient_gemini_error_once(status_code: int) -> None:
+    """Interactions APIの一時ステータスエラーだけを1回再試行する。"""
 
     repository = FakeRequestRepository()
-    backend = RetryBackend(APITimeoutError(Request("POST", "https://api.openai.com")))
+    backend = RetryBackend(gemini_status_error(status_code))
+    service = AgentService(
+        cast(Any, FakeSession),
+        "living-room-01",
+        "fake-model",
+        backend,
+        repository=cast(Any, repository),
+    )
+
+    result = asyncio.run(service.run("現在値は？"))
+
+    assert result.answer == "最新温度は24.5℃です。"
+    assert backend.calls == 2
+
+
+def test_service_retries_interactions_connection_error_once() -> None:
+    """Interactions APIが変換した接続エラーも1回再試行する。"""
+
+    repository = FakeRequestRepository()
+    request = httpx.Request(
+        "POST", "https://generativelanguage.googleapis.com/interactions"
+    )
+    backend = RetryBackend(APIConnectionError(request=request))
     service = AgentService(
         cast(Any, FakeSession),
         "living-room-01",
@@ -229,24 +265,21 @@ def test_service_retries_transient_openai_error_once() -> None:
 class PermanentFailureBackend:
     """認証エラーを返し、呼出し回数を記録する。"""
 
-    def __init__(self) -> None:
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
         self.calls = 0
 
     async def run(self, question: str, tools: ReadOnlyTools) -> AgentRunResult:
         self.calls += 1
-        request = Request("POST", "https://api.openai.com")
-        raise AuthenticationError(
-            "invalid API key",
-            response=Response(401, request=request),
-            body=None,
-        )
+        raise gemini_status_error(self.status_code)
 
 
-def test_service_does_not_retry_permanent_openai_error() -> None:
-    """認証失敗などの恒久エラーではOpenAIを再呼出ししない。"""
+@pytest.mark.parametrize("status_code", [400, 401, 403, 404, 409, 422])
+def test_service_does_not_retry_permanent_gemini_error(status_code: int) -> None:
+    """認証失敗などの恒久エラーではGeminiを再呼出ししない。"""
 
     repository = FakeRequestRepository()
-    backend = PermanentFailureBackend()
+    backend = PermanentFailureBackend(status_code)
     service = AgentService(
         cast(Any, FakeSession),
         "living-room-01",

@@ -24,7 +24,9 @@ sequenceDiagram
     W-->>U: HTML
 ```
 
-入力検証で拒否する質問ではAgentを生成せず、OpenAI APIを呼び出さない。実行前に`ai_requests`へRUNNINGを記録し、終了時に成功・失敗、モデル、Tool回数、トークン数を更新する。
+入力検証で拒否する質問ではAgentを生成せず、Gemini Developer APIを呼び出さない。実行前に`ai_requests`へRUNNINGを記録し、終了時に成功・失敗、モデル、Tool回数、トークン数を更新する。
+
+Agent境界はGoogle Gen AI SDKのInteractions APIを使用する。`GEMINI_API_KEY`を認証に、`GEMINI_MODEL`をモデル選択に使用し、既定モデルはFree Tier対象の`gemini-3.7-flash`とする。各要求は`store=false`としてGoogle側の会話保存を無効にし、質問、モデル出力、Tool呼出しおよびTool結果からなる履歴をアプリケーションメモリ内だけで保持する。有料モデルや有料Tierへのフォールバックは実装しない。
 
 AgentRunnerは、質問中に実行した各Toolの名前、正規化済み入力、構造化結果および呼出し順をリクエスト内の実行履歴として保持する。モデルへ渡したTool結果と検証に使用するTool結果は同一オブジェクトを正本とし、モデルが返した値を根拠データの正本として扱わない。実行履歴はリクエスト終了時に破棄し、質問・回答とは別にDBへ保存しない。
 
@@ -70,15 +72,15 @@ Instructionsには少なくとも次を記載する。
 | 質問文字数 | 2000文字 |
 | Tool呼出し | 5回／質問 |
 | Agentターン | 8回／質問 |
-| OpenAI応答待ち | 30秒／呼出し |
+| Gemini応答待ち | 30秒／呼出し |
 | Agent全体 | 60秒／質問 |
 | アプリ側自動再試行 | 一時エラー時1回まで |
 
-上限到達時は処理を停止し、`LIMIT_EXCEEDED`として記録する。外部AI障害は`AI_UNAVAILABLE`として画面へ返し、収集・Grafana・DBへ影響させない。
+上限到達時は処理を停止し、`LIMIT_EXCEEDED`として記録する。Geminiの接続失敗、408、429および5xxは一時エラーとし、Tool実行前に限り1回再試行する。呼出し回数をアプリケーションで一元管理するため、Google Gen AI SDK内部の自動再試行は無効化する。401等の恒久エラー、再試行失敗およびFree Tier上限到達は`AI_UNAVAILABLE`として画面へ返し、収集・Grafana・DBへ影響させない。
 
 ## 7. Agent出力契約
 
-AgentRunnerはモデルに自由文だけでなく次の構造を返させる。モデル出力は表示用回答の候補であり、根拠データの正本ではない。
+AgentRunnerはInteractions APIの`response_format`へJSON Schemaを指定し、モデルに自由文だけでなく次の構造を返させる。Function Callingと構造化出力を同時に利用できるGemini 3系だけを設定対象とする。この組み合わせはGemini API上のPreview機能であるため、SDKまたはモデルの更新時は回帰テストを必須とする。モデル出力は表示用回答の候補であり、根拠データの正本ではない。
 
 | フィールド | 内容 |
 |---|---|
@@ -99,4 +101,4 @@ AgentRunnerはモデル出力の構造検証後、保持しているTool実行�
 
 ## 8. 利用量とプライバシー
 
-質問・回答、モデル、Tool回数、入出力トークン、結果を`ai_requests`へ保存する。構造化ログには質問・回答本文を出さない。OpenAIへ渡すのは質問、Instructions、回答に必要なTool結果だけとし、APIキー、DB情報、セッション情報、他のログを含めない。
+質問・回答、モデル、Tool回数、入出力トークン、結果を`ai_requests`へ保存する。構造化ログには質問・回答本文を出さない。Geminiへ渡すのは質問、Instructions、回答に必要なTool結果だけとし、APIキー、DB情報、セッション情報、他のログを含めない。Free Tierでは送信内容がGoogleの製品改善に利用される場合があるため、個人情報や秘密情報を質問へ入力しない運用とする。
