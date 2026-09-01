@@ -10,7 +10,7 @@ from app.agent.service import AgentService
 from app.api.health_router import router as health_router
 from app.api.measurement_router import router as measurement_router
 from app.config import Settings
-from app.db.session import create_db_engine, create_session_factory
+from app.db.session import create_db_engine, create_readiness_engine, create_session_factory
 from app.observability.middleware import RequestContextMiddleware
 from app.security.headers import WebSecurityHeadersMiddleware
 from app.security.login_csrf import LoginCsrfManager
@@ -34,12 +34,15 @@ def create_app(settings: Settings) -> FastAPI:
         openapi_url=openapi_url,
     )
     application.state.settings = settings
+    application.state.db_engine = None
+    application.state.readiness_engine = None
     application.state.session_factory = None
     application.state.agent_handler = None
     # DB未設定でもLiveチェックを起動でき、測定APIは利用不能として503を返す。
     if settings.database_url is not None:
         engine = create_db_engine(settings)
         application.state.db_engine = engine
+        application.state.readiness_engine = create_readiness_engine(settings)
         application.state.session_factory = create_session_factory(engine)
     application.add_middleware(WebSecurityHeadersMiddleware)
     application.add_middleware(RequestContextMiddleware)

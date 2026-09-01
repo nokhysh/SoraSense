@@ -1,10 +1,19 @@
 """SQLAlchemyの接続設定とSession Factoryを検証する。"""
 
+from unittest.mock import patch
+
 import pytest
 from pydantic import ValidationError
+from sqlalchemy.pool import NullPool
 
 from app.config import Environment, Settings
-from app.db.session import create_db_engine, create_session_factory
+from app.db.session import (
+    READINESS_CONNECT_TIMEOUT_SECONDS,
+    READINESS_STATEMENT_TIMEOUT_MILLISECONDS,
+    create_db_engine,
+    create_readiness_engine,
+    create_session_factory,
+)
 
 
 def test_create_db_engine_uses_database_url() -> None:
@@ -34,6 +43,27 @@ def test_create_db_engine_rejects_missing_database_url() -> None:
 
     with pytest.raises(ValueError, match="APP_DATABASE_URL must be set"):
         create_db_engine(settings)
+
+
+def test_create_readiness_engine_has_finite_timeouts_and_no_pool() -> None:
+    """Ready専用Engineは接続・クエリ期限を持ち、接続を保持しない。"""
+
+    settings = Settings.model_validate(
+        {
+            "environment": Environment.TEST,
+            "database_url": "postgresql+psycopg://app_user:password@postgres:5432/sorasense",
+        }
+    )
+
+    with patch("app.db.session.create_engine") as create_engine:
+        create_readiness_engine(settings)
+
+    _, keyword_arguments = create_engine.call_args
+    assert keyword_arguments["poolclass"] is NullPool
+    assert keyword_arguments["connect_args"] == {
+        "connect_timeout": READINESS_CONNECT_TIMEOUT_SECONDS,
+        "options": f"-c statement_timeout={READINESS_STATEMENT_TIMEOUT_MILLISECONDS}",
+    }
 
 
 def test_settings_rejects_non_postgresql_database_url() -> None:

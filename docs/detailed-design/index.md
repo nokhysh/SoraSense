@@ -32,8 +32,8 @@
 | [database.md](database.md) | PostgreSQLの物理構造とマイグレーション | テーブル、VIEW、索引、DDL方針 |
 | [ai-agent.md](ai-agent.md) | Agentと参照専用Tool | Tool入出力、Instructions、制限値 |
 | [ui-grafana.md](ui-grafana.md) | AI質問画面とGrafana | HTMLフォーム、セッション、CSRF、表示、クエリ |
-| [infrastructure-operations.md](infrastructure-operations.md) | 配置、設定、ログ、監視、バックアップ | ローカルネットワーク、Secret、ログ、復旧 |
-| [test-design.md](test-design.md) | テストケースと受入確認 | 単体、結合、E2E、障害、性能、セキュリティ |
+| [infrastructure-operations.md](infrastructure-operations.md) | 配置、設定、ログ、監視 | ローカルネットワーク、Secret、ログ、Ready確認 |
+| [test-design.md](test-design.md) | テストケースと受入確認 | 単体、結合、E2E、セキュリティ |
 
 各仕様の正本は上表の担当文書とする。他文書では同じ仕様を再定義せず、正本を参照する。
 
@@ -82,8 +82,8 @@ flowchart LR
 | FR-013～023、FR-050～052 | `database.md`、`ui-grafana.md` |
 | FR-040～048、NFR-032、NFR-050～053 | `ai-agent.md`、`ui-grafana.md` |
 | FR-060～063 | `ui-grafana.md` |
-| NFR-001～003 | `backend.md`、`database.md`、`test-design.md` |
-| NFR-010～012 | `infrastructure-operations.md`、`test-design.md` |
+| NFR-002～003 | `backend.md`、`database.md`、`test-design.md` |
+| NFR-010～011 | `infrastructure-operations.md`、`test-design.md` |
 | NFR-020～025 | `backend.md`、`ai-agent.md`、`ui-grafana.md`、`infrastructure-operations.md` |
 | NFR-030～033 | `device.md`、`database.md`、`ai-agent.md`、`infrastructure-operations.md` |
 | NFR-040～043 | 全詳細設計文書、`test-design.md` |

@@ -7,7 +7,6 @@
 | `app` | ホストのLANアドレス:8000 | なし | `postgres` |
 | `postgres` | 内部5432のみ | PostgreSQL data volume | なし |
 | `grafana` | ホストのローカルアドレス:3000 | 原則不要、必要時のみvolume | `postgres` |
-| `backup` | 外部非公開 | 暗号化バックアップ保存先 | `postgres` |
 
 PostgreSQLをホストへ公開しない。`app`と`grafana`は別DBユーザーを使用する。コンテナは可能な限り非root、読み取り専用ルートファイルシステム、権限削減を適用する。
 
@@ -26,7 +25,7 @@ PostgreSQLをホストへ公開しない。`app`と`grafana`は別DBユーザー
 | Grafana | 管理者認証、`grafana_reader`接続情報、公開URL |
 | Device | ローカルHTTP API URL、Wi-Fi、デバイスAPIキー |
 
-Secret実値をGit管理対象のファイル、Composeファイル、Git履歴およびログへ登録しない。ローカル検証ではGit管理外の`.env`を使用し、Argon2idハッシュは`$`をComposeに展開させないよう値全体を一重引用符で囲む。本番ではDocker Secretまたは同等のSecret機構を使用する。起動時には存在と形式だけを検証し、値は出力しない。Secret更新手順は、新値発行、対象サービス更新、動作確認、旧値失効の順とする。
+Secret実値をGit管理対象のファイル、Composeファイル、Git履歴およびログへ登録しない。初期リリースではGit管理外の`.env`を使用し、Argon2idハッシュは`$`をComposeに展開させないよう値全体を一重引用符で囲む。Docker Secretまたは同等の専用Secret機構は将来対象とする。起動時には存在と形式だけを検証し、値は出力しない。Secret更新手順は、新値発行、対象サービス更新、動作確認、旧値失効の順とする。
 
 Geminiモデルを変更する場合は、`.env`の`GEMINI_MODEL`だけを書き換え、`docker compose up -d --force-recreate app`でappコンテナを再作成する。APIキーやComposeファイルの変更は不要とする。反映後は`docker compose exec -T app python -c "from app.config import Settings; print(Settings().gemini_model)"`でモデル名だけを確認し、質問を1件実行して`ai_requests.model`と成功状態を確認する。モデル変更を過去の監査レコードへ遡及適用しない。
 
@@ -62,7 +61,6 @@ Authorization、Cookie、APIキー、パスワード、DB接続文字列、セ�
 | `authentication.succeeded` / `authentication.failed` | Web認証結果 |
 | `dependency.unavailable` | DBまたはGemini利用不能 |
 | `health.ready.failed` | Ready確認失敗 |
-| `backup.completed` / `backup.failed` | バックアップ結果 |
 
 ## 7. 監視
 
@@ -70,28 +68,13 @@ Authorization、Cookie、APIキー、パスワード、DB接続文字列、セ�
 - `/health/live`と`/health/ready`を60秒間隔で確認する。
 - 受信成功件数、拒否件数、最終受信時刻、デバイス状態を確認する。
 - Agent成功・失敗、トークン利用量、処理時間を確認する。
-- ディスク空き容量、PostgreSQL接続数、バックアップ成否を確認する。
-- Ready失敗、最終受信10分超、バックアップ失敗、ディスク残量20%未満を運用確認対象とする。
+- PostgreSQL接続数を確認する。
+- Ready失敗と最終受信10分超を運用確認対象とする。
 
 初期リリースでは外部通知連携を要件に含めず、ログと管理者による定期確認を基本とする。
 
-## 8. バックアップ
+## 8. 初期リリースの復旧範囲
 
-`pg_dump`のカスタム形式で日次取得し、取得後に復元可能性を検査してから、DB本体と異なる保存先へ暗号化して保管する。保持期間は日次7世代、週次4世代を初期値とする。バックアップ暗号鍵はバックアップと別に管理する。成功・容量・所要時間・チェックサムを記録する。
+PostgreSQLの永続volumeを削除せず、PostgreSQL、FastAPI、Grafanaの順に再起動する。再起動後は`GET /health/ready`、主要VIEW、Grafana表示および新規測定受付を確認する。
 
-## 9. 復旧手順
-
-1. 障害範囲と復旧対象時点を決定する。
-2. 新しいPostgreSQL領域を用意する。
-3. バックアップのチェックサムと復号を確認する。
-4. Migration互換バージョンのDBへ`pg_restore`する。
-5. テーブル件数、最新測定日時、VIEW、DB権限を確認する。
-6. FastAPIを起動しReadyを確認する。
-7. Grafanaを起動し主要パネルを確認する。
-8. デバイス送信を再開し、新規測定と重複排除を確認する。
-
-月次で隔離環境へ復元し、RPO 24時間、RTO 4時間以内を記録する。
-
-## 10. デプロイとロールバック
-
-リリース前に設定検証、テスト、DBバックアップを実行する。DB Migration、app、Grafana、LAN公開・ファイアウォール設定の順に反映する。失敗時はアプリイメージを直前版へ戻す。DB downgradeがデータ損失を伴う場合は実行せず、バックアップから別DBへ復元して切り替える。
+日次バックアップ、暗号化、世代管理、隔離環境への復元、RPO・RTO保証および自動ロールバックは将来対象とし、初期リリースへ含めない。Migrationのdowngradeがデータ損失を伴う場合は実行しない。
