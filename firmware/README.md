@@ -23,10 +23,11 @@ PlatformIOのボード定義は、M5Stack公式`M5UnitUnified`が提供するM5S
 
 - デバイスIDとAPIキー
 - M5StickC Plus2から到達可能なMacのHTTPベースURL
-- Wi-FiのSSIDとパスワード
+- M5StickC Plus2が対応する2.4GHz Wi-FiのSSIDとパスワード
 - 2つ以上のNTPサーバー
 
 API URLは`http://{MacのプライベートIPv4}:8000`形式で指定する。`localhost`と`127.0.0.1`はM5StickC Plus2自身を指すため使用しない。公開インターネットへAPIキーを送らないよう、プライベートIPv4以外の送信先は設定検証で拒否する。
+`replace-with-`で始まるサンプル値は起動時に拒否する。実機へ書き込む前に、2.4GHz用SSID、API URLおよびデバイスAPIキーが実値へ置き換わっていることを確認する。
 
 ## 検証
 

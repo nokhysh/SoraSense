@@ -23,7 +23,7 @@ M5StickC Plus2による温湿度計測、HTTP APIによる収集、PostgreSQLへ
 
 | 区分 | 採用技術 | 主な責務 |
 |---|---|---|
-| センサーデバイス | M5StickC Plus2 / ENV IV Unit / Arduino | 温湿度取得、ローカルHTTP送信、失敗時再送 |
+| センサーデバイス | M5StickC Plus2 / ENV IV Unit / Arduino | 2.4GHz Wi-Fiでの温湿度取得、ローカルHTTP送信、失敗時再送 |
 | バックエンド | Python / FastAPI | 受信、検証、保存、異常判定、AI質問画面 |
 | DBアクセス | SQLAlchemy / Alembic | DBアクセス、スキーマ変更管理 |
 | データベース | PostgreSQL | 測定値、アラート、AI利用履歴の永続化と集計 |

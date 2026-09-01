@@ -18,7 +18,7 @@
 |---|---|
 | 本体・画面 | M5Stack公式のM5StickC Plus2対応ライブラリ |
 | ENV IV Unit | M5Stack公式ENV IV Unit対応ライブラリ |
-| Wi-Fi | Arduino-ESP32 `WiFi` |
+| Wi-Fi | Arduino-ESP32 `WiFi`。M5StickC Plus2が対応する2.4GHz帯だけを使用する |
 | HTTP | Arduino-ESP32 `WiFiClient`と`HTTPClient` |
 | JSON | ArduinoJson |
 | 時刻同期 | Arduino-ESP32 `configTzTime`または`configTime`によるNTP |
@@ -104,7 +104,7 @@ APIキーを画面、シリアルログ、エラー本文へ出力しない。
 
 ## 10. 設定値
 
-`DEVICE_ID`、`DEVICE_API_KEY`、HTTPの`API_BASE_URL`、NTPサーバー、Wi-Fi認証情報をビルド時Secretまたは端末用の非公開設定で注入する。CA証明書は使用しない。リポジトリへ実値を登録しない。
+`DEVICE_ID`、`DEVICE_API_KEY`、HTTPの`API_BASE_URL`、NTPサーバー、2.4GHz Wi-Fi認証情報をビルド時Secretまたは端末用の非公開設定で注入する。CA証明書は使用しない。リポジトリへ実値を登録しない。`replace-with-`で始まるサンプル値は設定済みと扱わず、起動時に`CONFIG REQUIRED`として停止する。
 
 ## 11. ログと端末表示
 

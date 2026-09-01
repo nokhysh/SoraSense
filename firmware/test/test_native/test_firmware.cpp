@@ -271,6 +271,20 @@ void test_validates_required_device_configuration_without_secret_output() {
     TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
 }
 
+void test_rejects_placeholder_device_configuration() {
+    auto config = valid_config();
+    config.device_api_key = "replace-with-device-api-key";
+    TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
+
+    config = valid_config();
+    config.wifi_ssid = "replace-with-wifi-ssid";
+    TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
+
+    config = valid_config();
+    config.wifi_password = "replace-with-wifi-password";
+    TEST_ASSERT_FALSE(sorasense::is_valid_device_config(config));
+}
+
 void test_sensor_reading_expires_only_after_five_seconds() {
     TEST_ASSERT_FALSE(sorasense::has_sensor_reading_expired(5'000U, 0U, false, 0U));
     TEST_ASSERT_TRUE(sorasense::has_sensor_reading_expired(5'001U, 0U, false, 0U));
@@ -311,6 +325,7 @@ int main() {
     RUN_TEST(test_new_measurement_replaces_pending_and_ignores_old_result);
     RUN_TEST(test_authentication_error_discards_pending);
     RUN_TEST(test_validates_required_device_configuration_without_secret_output);
+    RUN_TEST(test_rejects_placeholder_device_configuration);
     RUN_TEST(test_sensor_reading_expires_only_after_five_seconds);
     RUN_TEST(test_stopped_sensor_becomes_unready_after_reading_expires);
     return UNITY_END();

@@ -14,6 +14,10 @@ bool has_prefix(const char* value, const char* prefix) {
         && std::strncmp(value, prefix, std::strlen(prefix)) == 0;
 }
 
+bool is_configured_value(const char* value) {
+    return has_value(value) && !has_prefix(value, "replace-with-");
+}
+
 bool parse_number(
     const char*& cursor,
     const unsigned int maximum,
@@ -92,9 +96,11 @@ bool is_valid_device_id(const char* value) {
 }  // namespace
 
 bool is_valid_device_config(const DeviceConfig& config) {
-    return is_valid_device_id(config.device_id) && has_value(config.device_api_key)
-        && is_valid_local_http_url(config.api_base_url) && has_value(config.wifi_ssid)
-        && has_value(config.wifi_password) && has_value(config.ntp_server_1)
+    return is_valid_device_id(config.device_id)
+        && is_configured_value(config.device_api_key)
+        && is_valid_local_http_url(config.api_base_url)
+        && is_configured_value(config.wifi_ssid)
+        && is_configured_value(config.wifi_password) && has_value(config.ntp_server_1)
         && has_value(config.ntp_server_2);
 }
 
