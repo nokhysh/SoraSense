@@ -57,4 +57,16 @@ def test_ai_is_enabled_by_gemini_credentials_and_uses_free_tier_default() -> Non
     )
 
     assert settings.ai_enabled is True
-    assert settings.gemini_model == "gemini-3.7-flash"
+    assert settings.gemini_model == "gemini-3.5-flash-lite"
+
+
+def test_gemini_model_can_be_changed_only_by_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """モデル変更にコードやAPIキーの変更を要求しない。"""
+
+    monkeypatch.setenv("APP_GEMINI_MODEL", "gemini-next-free-tier")
+
+    settings = Settings(environment=Environment.TEST)
+
+    assert settings.gemini_model == "gemini-next-free-tier"

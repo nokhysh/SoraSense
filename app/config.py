@@ -111,7 +111,9 @@ class Settings(BaseSettings):
     web_login_lock_seconds: int = Field(default=900, ge=60, le=86400)
     web_form_max_bytes: int = Field(default=4096, ge=1024, le=65536)
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = Field(default="gemini-3.7-flash", min_length=1, max_length=100)
+    gemini_model: str = Field(
+        default="gemini-3.5-flash-lite", min_length=1, max_length=100
+    )
     alerts: AlertSettings = Field(default_factory=AlertSettings)
 
     @field_validator(

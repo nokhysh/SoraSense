@@ -21,7 +21,7 @@
 | Grafana OSS | 採用時のメジャー・マイナーバージョンをDockerイメージタグで固定する |
 | Arduinoライブラリ | `device.md`に定義したライブラリをバージョン固定する |
 | Gemini SDK | `google-genai==2.20.0`を依存管理ファイルで固定する |
-| Geminiモデル | Free Tier対象モデルを`GEMINI_MODEL`で指定し、既定値を`gemini-3.7-flash`とする |
+| Geminiモデル | Free Tier対象モデルを`GEMINI_MODEL`で指定し、既定値を`gemini-3.5-flash-lite`とする |
 
 ## 4. 文書構成
 
