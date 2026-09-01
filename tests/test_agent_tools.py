@@ -9,9 +9,15 @@ import pytest
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from app.agent.period_resolver import ResolvedPeriod
 from app.agent.schemas import ToolErrorCode
 from app.agent.tools import ReadOnlyTools, ToolLimitExceeded
-from app.schemas.query import DataStatus, LatestMeasurementDTO
+from app.schemas.query import (
+    DataStatus,
+    LatestMeasurementDTO,
+    MeasurementStatisticsDTO,
+    MetricStatistics,
+)
 
 
 class FakeSession(AbstractContextManager[Session]):
@@ -29,6 +35,7 @@ class FakeQueryService:
 
     def __init__(self, *, unavailable: bool = False) -> None:
         self.unavailable = unavailable
+        self.statistics_period: tuple[datetime, datetime] | None = None
 
     def get_latest_measurement(self, session: Session, device_id: str) -> LatestMeasurementDTO:
         if self.unavailable:
@@ -40,6 +47,25 @@ class FakeQueryService:
             humidity_percent=Decimal("50.0"),
             measured_at=datetime(2026, 8, 24, tzinfo=UTC),
             received_at=datetime(2026, 8, 24, tzinfo=UTC),
+        )
+
+    def get_measurement_statistics(
+        self,
+        session: Session,
+        device_id: str,
+        period_from: datetime,
+        period_to: datetime,
+    ) -> MeasurementStatisticsDTO:
+        self.statistics_period = (period_from, period_to)
+        empty = MetricStatistics(minimum=None, maximum=None, average=None, count=0)
+        return MeasurementStatisticsDTO(
+            data_status=DataStatus.NO_DATA,
+            device_id=device_id,
+            period_from=period_from,
+            period_to=period_to,
+            timezone="Asia/Tokyo",
+            temperature=empty,
+            humidity=empty,
         )
 
 
@@ -91,3 +117,58 @@ def test_tool_stops_before_sixth_call() -> None:
 
     with pytest.raises(ToolLimitExceeded):
         tools.get_latest_measurement("living-room-01")
+
+
+def test_tool_rejects_call_not_allowed_for_question() -> None:
+    """分類で公開しなかったToolはDB照会前に拒否する。"""
+
+    tools = ReadOnlyTools(
+        cast(Any, FakeSession),
+        "living-room-01",
+        query_service=cast(Any, FakeQueryService()),
+        allowed_tool_names=frozenset({"get_measurement_statistics"}),
+    )
+
+    with pytest.raises(ValueError, match="not allowed"):
+        tools.get_latest_measurement("living-room-01")
+
+
+def test_empty_allowed_tools_does_not_fall_back_to_all_tools() -> None:
+    """空の許可集合を全Tool許可として扱わない。"""
+
+    tools = ReadOnlyTools(
+        cast(Any, FakeSession),
+        "living-room-01",
+        query_service=cast(Any, FakeQueryService()),
+        allowed_tool_names=frozenset(),
+    )
+
+    with pytest.raises(ValueError, match="not allowed"):
+        tools.get_latest_measurement("living-room-01")
+
+
+def test_resolved_period_overrides_model_supplied_period_before_query() -> None:
+    """モデルの誤期間を使用せず、アプリが解決した期間だけを照会する。"""
+
+    service = FakeQueryService()
+    resolved = ResolvedPeriod(
+        datetime.fromisoformat("2026-08-29T00:00:00+09:00"),
+        datetime.fromisoformat("2026-08-30T00:00:00+09:00"),
+    )
+    tools = ReadOnlyTools(
+        cast(Any, FakeSession),
+        "living-room-01",
+        query_service=cast(Any, service),
+        allowed_tool_names=frozenset({"get_measurement_statistics"}),
+        resolved_periods=(resolved,),
+    )
+
+    tools.get_measurement_statistics(
+        "living-room-01",
+        datetime.fromisoformat("2024-05-01T00:00:00+09:00"),
+        datetime.fromisoformat("2024-05-20T23:59:59+09:00"),
+    )
+
+    assert service.statistics_period == (resolved.start, resolved.end)
+    assert tools.history[0].arguments["period_from"] == resolved.start.isoformat()
+    assert tools.history[0].arguments["period_to"] == resolved.end.isoformat()

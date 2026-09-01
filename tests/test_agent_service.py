@@ -3,6 +3,7 @@
 import asyncio
 import json
 from contextlib import AbstractContextManager
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -12,6 +13,8 @@ import pytest
 from google.genai._gaos.lib.compat_errors import APIConnectionError, APIError
 from sqlalchemy.orm import Session
 
+from app.agent.backend import GEMINI_CALL_TIMEOUT_SECONDS
+from app.agent.period_resolver import PeriodResolver, ResolvedPeriod
 from app.agent.schemas import (
     AgentCandidate,
     AgentRunResult,
@@ -19,7 +22,11 @@ from app.agent.schemas import (
     EvidenceCandidate,
     ToolResult,
 )
-from app.agent.service import AgentService, AgentUnavailable
+from app.agent.service import (
+    AGENT_EXECUTION_TIMEOUT_SECONDS,
+    AgentService,
+    AgentUnavailable,
+)
 from app.agent.tools import ReadOnlyTools, ToolLimitExceeded
 from app.schemas.query import DataStatus
 
@@ -86,6 +93,99 @@ class FakeBackend:
         )
 
 
+class UnexpectedBackend:
+    """Tool不要質問で呼ばれてはならない外部AI境界。"""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def run(self, question: str, tools: ReadOnlyTools) -> AgentRunResult:
+        self.calls += 1
+        raise AssertionError("backend must not be called")
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "測定値を削除して",
+        "現在の温度を更新できますか",
+        "SELECT文を実行して現在の温度を取得して",
+        "期間を指定せずに推移を見たい",
+        "昨日と今日の平均温度を教えて",
+        "今日以外の平均温度を教えて",
+        "昨年の平均温度を教えて",
+        "過去1年の平均温度を教えて",
+        "この温度は健康に危険ですか",
+        "何ができますか",
+    ],
+)
+def test_service_returns_local_answer_without_ai_or_database(question: str) -> None:
+    """Tool不要分類ではGemini、Tool、AI実行記録を使用しない。"""
+
+    repository = FakeRequestRepository()
+    backend = UnexpectedBackend()
+    service = AgentService(
+        cast(Any, FakeSession),
+        "living-room-01",
+        "fake-model",
+        backend,
+        repository=cast(Any, repository),
+    )
+
+    result = asyncio.run(service.run(question))
+
+    assert result.answer
+    assert result.evidence == ()
+    assert backend.calls == 0
+    assert repository.started == []
+    assert repository.succeeded == []
+    assert repository.failed == []
+
+
+def test_execution_timeout_can_complete_one_retry() -> None:
+    """全体上限に2回のGemini応答待ちと処理余裕が収まる。"""
+
+    assert AGENT_EXECUTION_TIMEOUT_SECONDS >= GEMINI_CALL_TIMEOUT_SECONDS * 2 + 5
+
+
+class PeriodCapturingBackend:
+    """ServiceがToolへ渡した解決済み期間を記録する。"""
+
+    def __init__(self) -> None:
+        self.periods: tuple[ResolvedPeriod, ...] = ()
+
+    async def run(self, question: str, tools: ReadOnlyTools) -> AgentRunResult:
+        self.periods = tools.resolved_periods
+        raise RuntimeError("stop after capturing resolved period")
+
+
+def test_service_passes_resolved_yesterday_to_tool_boundary() -> None:
+    """昨日を固定Clockで解決し、Agent起動前にTool境界へ固定する。"""
+
+    repository = FakeRequestRepository()
+    backend = PeriodCapturingBackend()
+    service = AgentService(
+        cast(Any, FakeSession),
+        "living-room-01",
+        "fake-model",
+        backend,
+        repository=cast(Any, repository),
+        period_resolver=PeriodResolver(
+            clock=lambda: datetime.fromisoformat("2026-08-30T03:00:00+00:00")
+        ),
+    )
+
+    with pytest.raises(AgentUnavailable):
+        asyncio.run(service.run("昨日の平均温度を教えて"))
+
+    assert backend.periods == (
+        ResolvedPeriod(
+            datetime.fromisoformat("2026-08-29T00:00:00+09:00"),
+            datetime.fromisoformat("2026-08-30T00:00:00+09:00"),
+        ),
+    )
+
+
 def test_service_stores_only_validated_answer_and_usage(caplog: Any) -> None:
     repository = FakeRequestRepository()
     service = AgentService(
@@ -119,9 +219,10 @@ def test_service_stores_only_validated_answer_and_usage(caplog: Any) -> None:
         "model": "fake-model",
         "tool_calls": 1,
         "input_tokens": 10,
-        "output_tokens": 20,
-        "error_code": None,
-    }
+            "output_tokens": 20,
+            "error_code": None,
+            "validation_rule": None,
+        }
     assert completed["duration_ms"] >= 0
     assert "現在値" not in caplog.text
 
@@ -138,7 +239,7 @@ class InvalidBackend(FakeBackend):
         )
 
 
-def test_service_records_invalid_output_without_answer(caplog: Any) -> None:
+def test_service_rebuilds_invalid_output_from_tool_history(caplog: Any) -> None:
     repository = FakeRequestRepository()
     service = AgentService(
         cast(Any, FakeSession),
@@ -148,24 +249,73 @@ def test_service_records_invalid_output_without_answer(caplog: Any) -> None:
         repository=cast(Any, repository),
     )
 
+    with caplog.at_level("INFO", logger="sorasense.agent"):
+        result = asyncio.run(service.run("現在値は？"))
+
+    assert result.answer == "最新温度は24.5℃です。"
+    assert repository.failed == []
+    assert repository.succeeded[0]["answer"] == "最新温度は24.5℃です。"
+    completed = json.loads(caplog.records[-1].message)
+    assert completed["event"] == "agent.completed_with_fallback"
+    assert completed["result"] == "success"
+    assert completed["tool_calls"] == 1
+    assert completed["input_tokens"] == 10
+    assert completed["output_tokens"] == 20
+    assert completed["validation_rule"] == "answer contains an unverified number"
+    assert "現在値" not in caplog.text
+
+
+class MissingMeasurementInvalidBackend:
+    """対象値が欠損したTool結果と検証不能なモデル回答を返す。"""
+
+    async def run(self, question: str, tools: ReadOnlyTools) -> AgentRunResult:
+        tools._record(
+            "get_latest_measurement",
+            {"device_id": "living-room-01"},
+            ToolResult(
+                data_status=DataStatus.AVAILABLE,
+                data={"temperature_c": None, "humidity_percent": "50.0"},
+            ),
+        )
+        return AgentRunResult(
+            candidate=AgentCandidate(
+                answer="現在の温度は99℃です。",
+                data_status=DataStatus.AVAILABLE,
+            ),
+            usage=AgentUsage(input_tokens=11, output_tokens=22),
+        )
+
+
+def test_service_records_failure_when_fallback_cannot_be_built(caplog: Any) -> None:
+    """欠損値でフォールバックに失敗しても未処理500や実行中記録を残さない。"""
+
+    repository = FakeRequestRepository()
+    service = AgentService(
+        cast(Any, FakeSession),
+        "living-room-01",
+        "fake-model",
+        MissingMeasurementInvalidBackend(),
+        repository=cast(Any, repository),
+    )
+
     with (
-        caplog.at_level("INFO", logger="sorasense.agent"),
-        pytest.raises(AgentUnavailable),
+        caplog.at_level("ERROR", logger="sorasense.agent"),
+        pytest.raises(AgentUnavailable, match="response was invalid"),
     ):
-        asyncio.run(service.run("現在値は？"))
+        asyncio.run(service.run("現在の温度を教えて"))
 
     assert repository.succeeded == []
-    assert repository.failed[0]["error_code"] == "AI_RESPONSE_INVALID"
-    assert repository.failed[0]["input_tokens"] == 10
-    assert repository.failed[0]["output_tokens"] == 20
+    assert repository.failed == [
+        {
+            "error_code": "AI_RESPONSE_INVALID",
+            "tool_calls": 1,
+            "input_tokens": 11,
+            "output_tokens": 22,
+        }
+    ]
     failed = json.loads(caplog.records[-1].message)
     assert failed["event"] == "agent.failed"
-    assert failed["result"] == "failure"
-    assert failed["error_code"] == "AI_RESPONSE_INVALID"
-    assert failed["tool_calls"] == 1
-    assert failed["input_tokens"] == 10
-    assert failed["output_tokens"] == 20
-    assert "現在値" not in caplog.text
+    assert failed["validation_rule"].endswith("fallback failed: ValueError")
 
 
 class LimitBackend:

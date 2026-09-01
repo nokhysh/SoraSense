@@ -10,7 +10,10 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.agent.backend import AgentBackend, AgentTurnLimitExceeded
+from app.agent.fallback import build_verified_fallback
 from app.agent.gemini_compat import GeminiAPIConnectionError, GeminiAPIError
+from app.agent.period_resolver import PeriodResolver, ResolvedPeriod
+from app.agent.question_classifier import QuestionClassifier, QuestionKind, QuestionRoute
 from app.agent.schemas import AgentRunResult
 from app.agent.tools import ReadOnlyTools, ToolLimitExceeded
 from app.agent.validation import AgentResponseInvalid, validate_and_build_display
@@ -19,6 +22,13 @@ from app.web.schemas import AgentDisplayResult
 
 SessionFactory = Callable[[], Session]
 TRANSIENT_GEMINI_STATUS_CODES = frozenset({408, 429})
+AGENT_EXECUTION_TIMEOUT_SECONDS = 100
+PERIOD_COUNT_BY_KIND = {
+    QuestionKind.STATISTICS: 1,
+    QuestionKind.SERIES: 1,
+    QuestionKind.COMPARE: 2,
+    QuestionKind.ALERT_HISTORY: 1,
+}
 logger = logging.getLogger("sorasense.agent")
 
 
@@ -37,28 +47,56 @@ class AgentService:
         backend: AgentBackend,
         *,
         repository: AIRequestRepository | None = None,
+        question_classifier: QuestionClassifier | None = None,
+        period_resolver: PeriodResolver | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._device_id = device_id
         self._model = model
         self._backend = backend
         self._repository = repository or AIRequestRepository()
+        self._question_classifier = question_classifier or QuestionClassifier()
+        self._period_resolver = period_resolver or PeriodResolver()
 
     async def run(self, question: str) -> AgentDisplayResult:
-        """最大60秒で実行し、検証済み回答だけを保存・表示する。"""
+        """最大100秒で実行し、検証済み回答または固定回答だけを表示する。"""
 
         if not 1 <= len(question) <= 2000:
             raise ValueError("question must be between 1 and 2000 characters")
+        route = self._question_classifier.classify(question)
+        if route.tool_name is None:
+            assert route.local_answer is not None
+            return AgentDisplayResult(answer=route.local_answer)
+        period_count = PERIOD_COUNT_BY_KIND.get(route.kind, 0)
+        resolved_periods: tuple[ResolvedPeriod, ...] = ()
+        if period_count:
+            resolved = self._period_resolver.resolve(
+                question, expected_count=period_count
+            )
+            if resolved is None:
+                clarification = QuestionRoute(QuestionKind.CLARIFICATION).local_answer
+                assert clarification is not None
+                return AgentDisplayResult(answer=clarification)
+            resolved_periods = resolved
         started_at = monotonic()
         with self._session_factory() as session:
             request = self._repository.start(session, question, self._model)
-        tools = ReadOnlyTools(self._session_factory, self._device_id, max_calls=5)
+        tools = ReadOnlyTools(
+            self._session_factory,
+            self._device_id,
+            max_calls=5,
+            allowed_tool_names=frozenset({route.tool_name}),
+            resolved_periods=resolved_periods,
+        )
         result: AgentRunResult | None = None
         try:
             result = await asyncio.wait_for(
-                self._run_with_one_retry(question, tools), timeout=60
+                self._run_with_one_retry(question, tools),
+                timeout=AGENT_EXECUTION_TIMEOUT_SECONDS,
             )
-            display = validate_and_build_display(result.candidate, tools.history, self._device_id)
+            display = validate_and_build_display(
+                result.candidate, tools.history, self._device_id
+            )
             with self._session_factory() as session:
                 self._repository.succeed(
                     session,
@@ -96,15 +134,43 @@ class AgentService:
             raise AgentUnavailable("tool call limit exceeded") from error
         except AgentResponseInvalid as error:
             assert result is not None
-            self._record_failure(
+            try:
+                display = build_verified_fallback(
+                    question, tools.history, self._device_id
+                )
+            except Exception as fallback_error:
+                self._record_failure(
+                    request.id,
+                    "AI_RESPONSE_INVALID",
+                    len(tools.history),
+                    started_at=started_at,
+                    input_tokens=result.usage.input_tokens,
+                    output_tokens=result.usage.output_tokens,
+                    validation_rule=(
+                        f"{error}; fallback failed: {type(fallback_error).__name__}"
+                    ),
+                )
+                raise AgentUnavailable("agent response was invalid") from fallback_error
+            with self._session_factory() as session:
+                self._repository.succeed(
+                    session,
+                    request.id,
+                    answer=display.answer,
+                    tool_calls=len(tools.history),
+                    input_tokens=result.usage.input_tokens,
+                    output_tokens=result.usage.output_tokens,
+                )
+            self._log_result(
+                "agent.completed_with_fallback",
                 request.id,
-                "AI_RESPONSE_INVALID",
-                len(tools.history),
-                started_at=started_at,
+                result="success",
+                duration_ms=self._duration_ms(started_at),
+                tool_calls=len(tools.history),
                 input_tokens=result.usage.input_tokens,
                 output_tokens=result.usage.output_tokens,
+                validation_rule=str(error),
             )
-            raise AgentUnavailable("agent response was invalid") from error
+            return display
         except Exception as error:
             self._record_failure(
                 request.id,
@@ -143,6 +209,7 @@ class AgentService:
         started_at: float,
         input_tokens: int | None = None,
         output_tokens: int | None = None,
+        validation_rule: str | None = None,
     ) -> None:
         with self._session_factory() as session:
             self._repository.fail(
@@ -162,6 +229,7 @@ class AgentService:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             error_code=error_code,
+            validation_rule=validation_rule,
         )
 
     def _log_result(
@@ -175,10 +243,12 @@ class AgentService:
         input_tokens: int | None,
         output_tokens: int | None,
         error_code: str | None = None,
+        validation_rule: str | None = None,
     ) -> None:
         """質問・回答本文を含めず、Agent終了結果を構造化ログへ出力する。"""
 
-        logger.info(
+        log = logger.error if result == "failure" else logger.info
+        log(
             json.dumps(
                 {
                     "event": event,
@@ -190,6 +260,7 @@ class AgentService:
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
                     "error_code": error_code,
+                    "validation_rule": validation_rule,
                 }
             )
         )

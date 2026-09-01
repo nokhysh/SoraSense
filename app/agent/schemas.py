@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -74,9 +74,18 @@ class AgentCandidate(AgentSchema):
     answer: str = Field(min_length=1, max_length=8000)
     period_from: datetime | None = None
     period_to: datetime | None = None
-    timezone: str = "Asia/Tokyo"
-    evidence: tuple[EvidenceCandidate, ...] = ()
-    calculations: tuple[CalculationCandidate, ...] = ()
+    timezone: Literal["Asia/Tokyo"] = "Asia/Tokyo"
+    evidence: tuple[EvidenceCandidate, ...] = Field(
+        default=(),
+        description=(
+            "answer内の各測定値・件数・Tool返却済み差分値に対応する根拠。"
+            "AVAILABLEの数値回答では空にしない。"
+        ),
+    )
+    calculations: tuple[CalculationCandidate, ...] = Field(
+        default=(),
+        description="answer内でTool結果から新たに計算した差または増減率の根拠。",
+    )
     data_status: DataStatus
 
 

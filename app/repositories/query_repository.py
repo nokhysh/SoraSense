@@ -111,15 +111,17 @@ class QueryRepository:
             "device_id": device_id,
             "period_from": period_from,
             "period_to": period_to,
-            "status": status,
             "limit": limit,
         }
         where = """
             device_id = :device_id
             AND started_at >= :period_from
             AND started_at < :period_to
-            AND (:status IS NULL OR status = :status)
         """
+        if status is not None:
+            # psycopgはNULLだけのパラメータ型を推論できないため、状態指定時だけ条件を加える。
+            where += " AND status = :status"
+            parameters["status"] = status
         total = session.execute(
             text(f"SELECT COUNT(*) FROM app.alerts WHERE {where}"),
             parameters,

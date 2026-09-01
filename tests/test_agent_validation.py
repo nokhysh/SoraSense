@@ -65,6 +65,159 @@ def test_valid_candidate_rebuilds_evidence_from_tool_history() -> None:
     assert result.evidence == ("最新温度: 24.5℃",)
 
 
+def test_answer_rejects_value_from_different_meaning_in_same_tool_result() -> None:
+    """同じTool内でも最高温度へ最低温度の値を流用させない。"""
+
+    record = ToolCallRecord(
+        index=1,
+        name="get_measurement_statistics",
+        arguments={
+            "device_id": "living-room-01",
+            "period_from": "2026-08-24T00:00:00Z",
+            "period_to": "2026-08-25T00:00:00Z",
+        },
+        result=ToolResult(
+            data_status=DataStatus.AVAILABLE,
+            data={
+                "temperature": {"minimum": "10.0", "maximum": "30.0"},
+                "humidity": {"minimum": "40.0", "maximum": "60.0"},
+            },
+        ),
+    )
+    invalid = AgentCandidate(
+        answer="最高温度は10.0℃です。",
+        data_status=DataStatus.AVAILABLE,
+        evidence=(
+            EvidenceCandidate(
+                label="最高温度",
+                value=Decimal("30.0"),
+                unit="℃",
+                source_call_index=1,
+                source_path="data.temperature.maximum",
+            ),
+        ),
+    )
+
+    with pytest.raises(AgentResponseInvalid, match="unverified number"):
+        validate_and_build_display(invalid, [record], "living-room-01")
+
+
+def test_latest_measurement_period_matches_measured_at() -> None:
+    """最新値の測定時刻を一点の対象期間として表示する。"""
+
+    measured_at = datetime(2026, 8, 24, tzinfo=UTC)
+    valid = candidate().model_copy(
+        update={"period_from": measured_at, "period_to": measured_at}
+    )
+
+    result = validate_and_build_display(valid, history(), "living-room-01")
+
+    assert result.period == (
+        "2026-08-24T09:00:00+09:00〜2026-08-24T09:00:00+09:00 (Asia/Tokyo)"
+    )
+
+
+def test_answer_allows_observed_at_rendered_in_asia_tokyo() -> None:
+    """UTCの測定日時を東京時間へ変換した年月日時分秒を許可する。"""
+
+    measured_at = datetime(2026, 8, 24, tzinfo=UTC)
+    valid = candidate().model_copy(
+        update={
+            "answer": "対象日時は2026年8月24日9時0分0秒、最新温度は24.5℃です。",
+            "period_from": measured_at,
+            "period_to": measured_at,
+        }
+    )
+
+    result = validate_and_build_display(valid, history(), "living-room-01")
+
+    assert result.answer.startswith("対象日時は2026年8月24日9時0分0秒")
+
+
+def test_answer_allows_complete_utc_datetime_in_japanese_format() -> None:
+    """UTCの完全日時をゼロ埋めした日本語表現でも許可する。"""
+
+    measured_at = datetime(2026, 8, 24, tzinfo=UTC)
+    valid = candidate().model_copy(
+        update={
+            "answer": "対象日時は2026年08月24日 00:00:00、最新温度は24.5℃です。",
+            "period_from": measured_at,
+            "period_to": measured_at,
+        }
+    )
+
+    result = validate_and_build_display(valid, history(), "living-room-01")
+
+    assert result.answer.startswith("対象日時は2026年08月24日 00:00:00")
+
+
+def test_answer_allows_complete_local_date_from_evidence_datetime() -> None:
+    """根拠日時の東京日付と完全一致する日付全体を許可する。"""
+
+    measured_at = datetime(2026, 8, 24, tzinfo=UTC)
+    valid = candidate().model_copy(
+        update={
+            "answer": "対象日は2026年8月24日、最新温度は24.5℃です。",
+            "period_from": measured_at,
+            "period_to": measured_at,
+        }
+    )
+
+    result = validate_and_build_display(valid, history(), "living-room-01")
+
+    assert result.answer.startswith("対象日は2026年8月24日")
+
+
+def test_answer_allows_complete_local_month_and_day() -> None:
+    """根拠日時の東京月日と完全一致する省略日付全体を許可する。"""
+
+    measured_at = datetime(2026, 8, 24, tzinfo=UTC)
+    valid = candidate().model_copy(
+        update={
+            "answer": "対象日は8月24日、最新温度は24.5℃です。",
+            "period_from": measured_at,
+            "period_to": measured_at,
+        }
+    )
+
+    result = validate_and_build_display(valid, history(), "living-room-01")
+
+    assert result.answer.startswith("対象日は8月24日")
+
+
+def test_answer_allows_complete_hour_and_minute_from_period() -> None:
+    """根拠期間と完全一致する時分表現を一体として許可する。"""
+
+    measured_at = datetime(2026, 8, 24, tzinfo=UTC)
+    valid = candidate().model_copy(
+        update={
+            "answer": "対象時刻は09:00、最新温度は24.5℃です。",
+            "period_from": measured_at,
+            "period_to": measured_at,
+        }
+    )
+
+    result = validate_and_build_display(valid, history(), "living-room-01")
+
+    assert result.answer.startswith("対象時刻は09:00")
+
+
+def test_answer_rejects_recombined_datetime_components() -> None:
+    """根拠日時の構成要素を別の位置へ流用した存在しない日時を拒否する。"""
+
+    measured_at = datetime(2026, 8, 24, tzinfo=UTC)
+    invalid = candidate().model_copy(
+        update={
+            "answer": "対象日時は2026年9月24日9時0分0秒、最新温度は24.5℃です。",
+            "period_from": measured_at,
+            "period_to": measured_at,
+        }
+    )
+
+    with pytest.raises(AgentResponseInvalid, match="unverified datetime"):
+        validate_and_build_display(invalid, history(), "living-room-01")
+
+
 def test_value_not_in_tool_result_is_rejected() -> None:
     with pytest.raises(AgentResponseInvalid, match="evidence"):
         validate_and_build_display(candidate(Decimal("99.9")), history(), "living-room-01")
@@ -102,6 +255,73 @@ def test_evidence_label_and_unit_must_match_source_path(label: str, unit: str) -
 
     with pytest.raises(AgentResponseInvalid, match="label or unit"):
         validate_and_build_display(invalid, history(), "living-room-01")
+
+
+def test_statistics_synonym_is_accepted_and_rebuilt_with_canonical_label() -> None:
+    """自然な最高温度を許可し、表示根拠は正規ラベルへ戻す。"""
+
+    records = [
+        ToolCallRecord(
+            index=1,
+            name="get_measurement_statistics",
+            arguments={"device_id": "living-room-01"},
+            result=ToolResult(
+                data_status=DataStatus.AVAILABLE,
+                data={"temperature": {"maximum": "25.0"}},
+            ),
+        )
+    ]
+    valid = AgentCandidate(
+        answer="最高温度は25.0℃です。",
+        timezone="Asia/Tokyo",
+        data_status=DataStatus.AVAILABLE,
+        evidence=(
+            EvidenceCandidate(
+                label="最高温度",
+                value=Decimal("25.0"),
+                unit="℃",
+                source_call_index=1,
+                source_path="data.temperature.maximum",
+            ),
+        ),
+    )
+
+    result = validate_and_build_display(valid, records, "living-room-01")
+
+    assert result.evidence == ("温度最大値: 25.0℃",)
+
+
+def test_statistics_synonym_for_other_metric_is_rejected() -> None:
+    """温度の参照先を最高湿度というラベルへ置換できない。"""
+
+    records = [
+        ToolCallRecord(
+            index=1,
+            name="get_measurement_statistics",
+            arguments={"device_id": "living-room-01"},
+            result=ToolResult(
+                data_status=DataStatus.AVAILABLE,
+                data={"temperature": {"maximum": "25.0"}},
+            ),
+        )
+    ]
+    invalid = AgentCandidate(
+        answer="最高温度は25.0℃です。",
+        timezone="Asia/Tokyo",
+        data_status=DataStatus.AVAILABLE,
+        evidence=(
+            EvidenceCandidate(
+                label="最高湿度",
+                value=Decimal("25.0"),
+                unit="℃",
+                source_call_index=1,
+                source_path="data.temperature.maximum",
+            ),
+        ),
+    )
+
+    with pytest.raises(AgentResponseInvalid, match="label or unit"):
+        validate_and_build_display(invalid, records, "living-room-01")
 
 
 def test_series_and_alert_array_paths_are_resolved() -> None:

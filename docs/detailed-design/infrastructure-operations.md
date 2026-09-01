@@ -28,6 +28,8 @@ PostgreSQLをホストへ公開しない。`app`と`grafana`は別DBユーザー
 
 Secret実値をGit管理対象のファイル、Composeファイル、Git履歴およびログへ登録しない。ローカル検証ではGit管理外の`.env`を使用し、Argon2idハッシュは`$`をComposeに展開させないよう値全体を一重引用符で囲む。本番ではDocker Secretまたは同等のSecret機構を使用する。起動時には存在と形式だけを検証し、値は出力しない。Secret更新手順は、新値発行、対象サービス更新、動作確認、旧値失効の順とする。
 
+Geminiモデルを変更する場合は、`.env`の`GEMINI_MODEL`だけを書き換え、`docker compose up -d --force-recreate app`でappコンテナを再作成する。APIキーやComposeファイルの変更は不要とする。反映後は`docker compose exec -T app python -c "from app.config import Settings; print(Settings().gemini_model)"`でモデル名だけを確認し、質問を1件実行して`ai_requests.model`と成功状態を確認する。モデル変更を過去の監査レコードへ遡及適用しない。
+
 ## 5. 構造化ログ
 
 標準出力へ1イベント1 JSONで出力する。
@@ -44,6 +46,7 @@ Secret実値をGit管理対象のファイル、Composeファイル、Git履歴�
 | `result` | success / rejected / failure |
 | `duration_ms` | 処理時間 |
 | `error_code` | 分類済みエラーコード |
+| `validation_rule` | Agent回答検証に失敗した固定ルール。質問・回答・測定値は含めない |
 
 Authorization、Cookie、APIキー、パスワード、DB接続文字列、セッションID、質問・回答本文、測定値全件、スタックトレースの外部転送を禁止する。スタックトレースは想定外エラー時にローカル標準エラーへ出せるが、Secretマスク処理を通す。
 

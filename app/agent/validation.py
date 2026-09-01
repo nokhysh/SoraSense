@@ -21,6 +21,10 @@ NUMBER = re.compile(
     r"(?<![A-Za-z0-9_])[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)"
     r"(?:\.\d+)?(?:[eE][+-]?\d+)?(?![A-Za-z0-9_])"
 )
+DATE_LIKE = re.compile(
+    r"(?<!\d)\d{4}年\s*\d{1,2}月\s*\d{1,2}日|"
+    r"(?<!\d)\d{4}-\d{1,2}-\d{1,2}(?!\d)"
+)
 UNIT_PREFIXES = (
     ("℃", "℃"),
     ("度", "℃"),
@@ -30,6 +34,18 @@ UNIT_PREFIXES = (
     ("回", "件"),
 )
 DISPLAY_ZONE = ZoneInfo("Asia/Tokyo")
+LABEL_ALIASES: dict[str, frozenset[str]] = {
+    "最新温度": frozenset({"最新温度", "現在温度", "現在の温度"}),
+    "最新湿度": frozenset({"最新湿度", "現在湿度", "現在の湿度"}),
+    "温度最小値": frozenset({"温度最小値", "最小温度", "最低温度"}),
+    "温度最大値": frozenset({"温度最大値", "最大温度", "最高温度"}),
+    "温度平均値": frozenset({"温度平均値", "平均温度"}),
+    "温度測定件数": frozenset({"温度測定件数", "温度件数", "測定件数"}),
+    "湿度最小値": frozenset({"湿度最小値", "最小湿度", "最低湿度"}),
+    "湿度最大値": frozenset({"湿度最大値", "最大湿度", "最高湿度"}),
+    "湿度平均値": frozenset({"湿度平均値", "平均湿度"}),
+    "湿度測定件数": frozenset({"湿度測定件数", "湿度件数", "測定件数"}),
+}
 
 
 class AgentResponseInvalid(ValueError):
@@ -58,19 +74,21 @@ def validate_and_build_display(
     evidence_records: list[ToolCallRecord] = []
     allowed_by_unit: dict[str | None, set[Decimal]] = {}
     allowed_any: set[Decimal] = set()
+    allowed_datetimes: set[datetime] = set()
     for item in candidate.evidence:
         record = _record(history, item.source_call_index)
         actual = _resolve(record, item.source_path)
         meaning = _meaning(record, item.source_path)
         if not _same_value(actual, item.value):
             raise AgentResponseInvalid("evidence does not match tool result")
-        if item.label != meaning.label or item.unit != meaning.unit:
+        allowed_labels = LABEL_ALIASES.get(meaning.label, frozenset({meaning.label}))
+        if item.label not in allowed_labels or item.unit != meaning.unit:
             raise AgentResponseInvalid("evidence label or unit does not match source path")
         if item.observed_at is not None:
             serialized_result = str(record.result.data).replace("Z", "+00:00")
             if item.observed_at.isoformat() not in serialized_result:
                 raise AgentResponseInvalid("evidence timestamp does not match tool result")
-            allowed_any.update(_numbers(item.observed_at.isoformat()))
+            allowed_datetimes.add(item.observed_at)
         numeric_value = _decimal_or_none(item.value)
         if numeric_value is not None:
             allowed_by_unit.setdefault(meaning.unit, set()).add(numeric_value)
@@ -92,10 +110,13 @@ def validate_and_build_display(
 
     period = _validate_period(candidate, relevant_records)
     if candidate.period_from is not None and candidate.period_to is not None:
-        allowed_any.update(_numbers(candidate.period_from.isoformat()))
-        allowed_any.update(_numbers(candidate.period_to.isoformat()))
+        allowed_datetimes.add(candidate.period_from)
+        allowed_datetimes.add(candidate.period_to)
 
-    _validate_answer_numbers(candidate.answer, allowed_any, allowed_by_unit)
+    answer_without_datetimes = _mask_verified_datetimes(
+        candidate.answer, allowed_datetimes
+    )
+    _validate_answer_numbers(answer_without_datetimes, allowed_any, allowed_by_unit)
 
     if candidate.data_status is DataStatus.NO_DATA and not rebuilt:
         rebuilt.append("該当データなし")
@@ -105,8 +126,6 @@ def validate_and_build_display(
         period=period,
         evidence=tuple(rebuilt),
     )
-
-
 def _record(history: list[ToolCallRecord], index: int) -> ToolCallRecord:
     try:
         record = history[index - 1]
@@ -245,6 +264,10 @@ def _validate_period(
 
 
 def _record_contains_period(record: ToolCallRecord, start: datetime, end: datetime) -> bool:
+    if record.name == "get_latest_measurement" and record.result.data is not None:
+        measured_at = _datetime_or_none(record.result.data.get("measured_at"))
+        return measured_at == start and measured_at == end
+
     pairs = (
         ("period_from", "period_to"),
         ("first_from", "first_to"),
@@ -287,9 +310,71 @@ def _validate_answer_numbers(
             raise AgentResponseInvalid("answer contains an unverified number")
 
 
-def _numbers(value: str) -> set[Decimal]:
-    normalized_value = unicodedata.normalize("NFKC", value)
-    return {
-        Decimal(match.group().replace(",", ""))
-        for match in NUMBER.finditer(normalized_value)
+def _mask_verified_datetimes(answer: str, values: set[datetime]) -> str:
+    """根拠時刻と完全一致する日時表現だけを数値検証対象から除外する。"""
+
+    normalized = unicodedata.normalize("NFKC", answer)
+    variants = {
+        unicodedata.normalize("NFKC", variant)
+        for value in values
+        for variant in _datetime_variants(value)
     }
+    for variant in sorted(variants, key=len, reverse=True):
+        normalized = normalized.replace(variant, "<verified-datetime>")
+    if DATE_LIKE.search(normalized):
+        raise AgentResponseInvalid("answer contains an unverified datetime")
+    return normalized
+
+
+def _datetime_variants(value: datetime) -> set[str]:
+    """UTCとAsia/Tokyoの許可済み完全日時表現を列挙する。"""
+
+    utc_value = value.astimezone(ZoneInfo("UTC"))
+    local_value = value.astimezone(DISPLAY_ZONE)
+    utc_iso = utc_value.isoformat(timespec="seconds")
+    local_iso = local_value.isoformat(timespec="seconds")
+    return {
+        utc_iso,
+        utc_iso.replace("+00:00", "Z"),
+        local_iso,
+        f"{utc_value:%Y-%m-%d}",
+        f"{local_value:%Y-%m-%d}",
+        f"{utc_value.year}年{utc_value.month}月{utc_value.day}日",
+        f"{utc_value:%Y年%m月%d日}",
+        f"{local_value.year}年{local_value.month}月{local_value.day}日",
+        f"{local_value:%Y年%m月%d日}",
+        f"{utc_value.month}月{utc_value.day}日",
+        f"{utc_value:%m月%d日}",
+        f"{local_value.month}月{local_value.day}日",
+        f"{local_value:%m月%d日}",
+        *_readable_datetime_variants(utc_value),
+        *_readable_datetime_variants(local_value),
+    }
+
+
+def _readable_datetime_variants(value: datetime) -> set[str]:
+    """指定タイムゾーンの完全日時を日本語と数値表現で列挙する。"""
+
+    dates = {
+        f"{value.year}年{value.month}月{value.day}日",
+        f"{value:%Y年%m月%d日}",
+    }
+    times = {
+        f"{value.hour}時{value.minute}分{value.second}秒",
+        f"{value:%H時%M分%S秒}",
+        f"{value:%H:%M:%S}",
+        f"{value.hour}時{value.minute}分",
+        f"{value:%H時%M分}",
+        f"{value:%H:%M}",
+    }
+    variants = {
+        f"{value:%Y-%m-%d %H:%M:%S}",
+        *(
+            f"{date}{separator}{time}"
+            for date in dates
+            for time in times
+            for separator in ("", " ")
+        ),
+    }
+    variants.update(times)
+    return variants
