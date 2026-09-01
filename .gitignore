@@ -6,5 +6,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .vscode/
+.DS_Store
 firmware/.pio/
 firmware/include/device_secrets.h
