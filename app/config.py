@@ -7,6 +7,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    HttpUrl,
     PostgresDsn,
     SecretStr,
     field_validator,
@@ -110,6 +111,9 @@ class Settings(BaseSettings):
     web_login_max_attempts: int = Field(default=5, ge=1, le=100)
     web_login_lock_seconds: int = Field(default=900, ge=60, le=86400)
     web_form_max_bytes: int = Field(default=4096, ge=1024, le=65536)
+    grafana_dashboard_url: HttpUrl = HttpUrl(
+        "http://127.0.0.1:3000/d/sorasense-overview/sorasense-overview"
+    )
     gemini_api_key: SecretStr | None = None
     gemini_model: str = Field(
         default="gemini-3.5-flash-lite", min_length=1, max_length=100

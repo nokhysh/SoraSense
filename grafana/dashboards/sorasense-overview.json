@@ -5,12 +5,12 @@
   "graphTooltip": 1,
   "id": null,
   "links": [
-    {"asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": [], "targetBlank": false, "title": "AIに質問", "tooltip": "AI質問画面を開く", "type": "link", "url": "http://localhost:8000/agent"}
+    {"asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": [], "targetBlank": false, "title": "AIに質問", "tooltip": "AI質問画面を開く", "type": "link", "url": "__AI_PUBLIC_URL__"}
   ],
   "panels": [
     {
       "datasource": {"type": "postgres", "uid": "sorasense-postgresql"},
-      "fieldConfig": {"defaults": {"mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 2}]}}, "overrides": []},
+      "fieldConfig": {"defaults": {"mappings": [{"options": {"0": {"index": 0, "text": "OFFLINE"}, "1": {"index": 1, "text": "STALE"}, "2": {"index": 2, "text": "ONLINE"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 2}]}}, "overrides": []},
       "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
       "id": 1,
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},

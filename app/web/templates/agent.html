@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}AIアシスタント | SoraSense{% endblock %}
 {% block content %}
-  <nav><a href="http://localhost:3000/">Grafanaを開く</a></nav>
+  <nav><a href="{{ grafana_dashboard_url }}">Grafanaを開く</a></nav>
   <section class="card" aria-labelledby="agent-heading">
     <h1 id="agent-heading">AIアシスタント</h1>
     {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}

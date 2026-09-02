@@ -81,7 +81,7 @@ def test_login_regenerates_session_and_sets_security_headers() -> None:
     assert "SameSite=lax" in cookie
     agent = client.get("/agent")
     assert agent.status_code == 200
-    assert 'href="http://localhost:3000/"' in agent.text
+    assert 'href="http://127.0.0.1:3000/d/sorasense-overview/sorasense-overview"' in agent.text
     assert agent.headers["Cache-Control"] == "no-store"
     assert "frame-ancestors 'none'" in agent.headers["Content-Security-Policy"]
 

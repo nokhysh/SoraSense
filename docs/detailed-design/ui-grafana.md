@@ -12,7 +12,7 @@
 | Grafanaログイン | Grafana標準 | 不要 | Grafanaローカル認証 | Grafana標準 |
 | ダッシュボード | Grafana標準URL | 必須 | 現在値、履歴、統計、アラート、状態 | Grafana標準 |
 
-認証が必要なGETでセッションが存在しないか失効している場合は、Cookieを削除して`/login?reason=session_expired`へ303で遷移する。状態変更POSTはリダイレクトで処理せず、安全なエラー画面を返す。AI画面とGrafanaダッシュボードには相互リンクを置く。管理画面、デバイス変更画面、閾値変更画面は作らない。
+認証が必要なGETでセッションが存在しないか失効している場合は、Cookieを削除して`/login?reason=session_expired`へ303で遷移する。状態変更POSTはリダイレクトで処理せず、安全なエラー画面を返す。AI画面とGrafanaダッシュボードには相互リンクを置き、AI画面からはGrafanaトップではなくUIDが`sorasense-overview`のダッシュボードへ直接遷移する。相互リンクと両サービスの公開先には`APP_BIND_ADDRESS`を使用し、Grafana起動時にダッシュボード定義へAI画面の公開URLを展開する。管理画面、デバイス変更画面、閾値変更画面は作らない。
 
 ## 3. モジュール構成と責務
 
@@ -45,6 +45,7 @@
 | `APP_WEB_LOGIN_MAX_ATTEMPTS` | `5` | 制限開始前に許可する失敗回数 |
 | `APP_WEB_LOGIN_LOCK_SECONDS` | `900` | 制限時間 |
 | `APP_WEB_FORM_MAX_BYTES` | `4096` | ログイン・質問フォーム共通の本文上限 |
+| `APP_GRAFANA_DASHBOARD_URL` | `http://127.0.0.1:3000/d/sorasense-overview/sorasense-overview` | AI画面から遷移するGrafanaダッシュボードの公開URL |
 
 Web UIは利用者名とパスワードハッシュの両方が設定された場合だけ有効とする。片方だけの設定は全環境で起動時エラーとする。本番環境では両方を必須とする。開発・テストで両方が未設定の場合はWeb経路を登録せず、測定APIとヘルスチェックだけを利用可能にする。
 

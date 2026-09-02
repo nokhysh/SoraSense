@@ -31,6 +31,27 @@ def test_dashboard_uses_only_reporting_views_and_has_required_panels() -> None:
     assert dashboard["editable"] is False
     assert dashboard["timezone"] == "Asia/Tokyo"
 
+    status_panel = next(panel for panel in dashboard["panels"] if panel["title"] == "デバイス状態")
+    status_mapping = status_panel["fieldConfig"]["defaults"]["mappings"][0]
+    assert status_mapping["type"] == "value"
+    assert {
+        value: option["text"] for value, option in status_mapping["options"].items()
+    } == {"0": "OFFLINE", "1": "STALE", "2": "ONLINE"}
+
+
+def test_dashboard_links_to_ai_question_page() -> None:
+    """GrafanaからAI質問画面へ正しいローカルURLで遷移できる。"""
+
+    dashboard = json.loads(Path("grafana/dashboards/sorasense-overview.json").read_text())
+
+    assert len(dashboard["links"]) == 1
+    assert dashboard["links"][0]["title"] == "AIに質問"
+    assert dashboard["links"][0]["url"] == "__AI_PUBLIC_URL__"
+
+    compose = Path("compose.yaml").read_text()
+    assert "AI_PUBLIC_URL: http://${APP_BIND_ADDRESS:-127.0.0.1}:8000/agent" in compose
+    assert 'sed "s|__AI_PUBLIC_URL__|$${AI_PUBLIC_URL}|g"' in compose
+
 
 def test_datasource_reads_password_from_environment() -> None:
     """接続SecretをProvisioningファイルへ直書きしない。"""

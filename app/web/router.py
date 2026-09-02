@@ -64,7 +64,11 @@ def _render(
     return templates.TemplateResponse(
         request=request,
         name=name,
-        context={"request_id": request.state.request_id, **context},
+        context={
+            "request_id": request.state.request_id,
+            "grafana_dashboard_url": _settings(request).grafana_dashboard_url,
+            **context,
+        },
         status_code=status_code,
     )
 

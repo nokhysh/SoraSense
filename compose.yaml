@@ -9,6 +9,7 @@ services:
       APP_DEVICE_API_KEY_HASH: ${DEVICE_API_KEY_HASH:?DEVICE_API_KEY_HASH must be set}
       APP_WEB_USERNAME: ${WEB_USERNAME:?WEB_USERNAME must be set}
       APP_WEB_PASSWORD_HASH: ${WEB_PASSWORD_HASH:?WEB_PASSWORD_HASH must be set}
+      APP_GRAFANA_DASHBOARD_URL: http://${APP_BIND_ADDRESS:-127.0.0.1}:3000/d/sorasense-overview/sorasense-overview
       APP_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       APP_GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
       APP_ALERTS__TEMPERATURE__LOWER: ${TEMPERATURE_LOWER:-10.0}
@@ -132,11 +133,12 @@ services:
       GF_EXPLORE_ENABLED: "false"
       GRAFANA_READER_PASSWORD: ${GRAFANA_READER_PASSWORD:?GRAFANA_READER_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-sorasense}
+      AI_PUBLIC_URL: http://${APP_BIND_ADDRESS:-127.0.0.1}:8000/agent
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:3000:3000"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboard-templates:ro
     networks:
       - backend
       - frontend
@@ -151,6 +153,14 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+        mkdir -p /tmp/grafana-dashboards
+        sed "s|__AI_PUBLIC_URL__|$${AI_PUBLIC_URL}|g" /var/lib/grafana/dashboard-templates/sorasense-overview.json > /tmp/grafana-dashboards/sorasense-overview.json
+        exec /run.sh
     healthcheck:
       test:
         - CMD-SHELL
